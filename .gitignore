@@ -36,3 +36,6 @@ Backups/
 config/crm-connection*.json
 *_settings.json
 scratchpad/
+
+# Locally generated EGS test signing key (created at runtime / by tests)
+config/egs_test_signing_key.pem

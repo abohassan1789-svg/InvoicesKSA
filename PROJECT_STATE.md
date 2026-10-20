@@ -2,6 +2,20 @@
 
 Last updated: 2026-09-19
 
+## «نهلة الخليج» Invoice Template Re-shown in Both Phases (added 2026-10-20)
+
+The «نهلة الخليج التجارية» replica (`saudi_invoice_print_v14.py`, formerly
+labelled «نموذج أطياف», hidden on 2026-10-17) is back as the **last option
+(21) of both invoice pickers**, under the name **«نهلة الخليج»**:
+
+- Phase-2 (`SaudiSalesInvoicePage._choose_invoice_builder`) →
+  `build_invoice_html_v14` with the signed tags 1–9 QR.
+- «مرحلة أولى» (`PHASE1_TEMPLATE_OPTIONS` / `_PHASE1_BUILDERS[21]`) →
+  `build_phase1_invoice_atyaf` with the tags 1–5 QR.
+- Both pickers still list the same labels in the same order (now 21).
+- Tests: `tests/unit/test_invoice_template_dispatch.py` updated (21 options,
+  new last label, Phase-1 QR swap for choice 21).
+
 ## «سندات» Receipt-Voucher Column in the Search Dialog (added 2026-09-19)
 
 A third per-row PDF link column, **«سندات»**, exports a **Phase-2 receipt voucher

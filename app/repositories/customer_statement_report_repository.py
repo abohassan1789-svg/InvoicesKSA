@@ -304,7 +304,7 @@ class CustomerStatementReportRepository:
         """The selected company's full identity, for the printed letterhead.
 
         ``companies`` — not ``company_settings`` — is where the live data is: both
-        names, the VAT and CR numbers, the addresses and the logo blob. It is also
+        names, the VAT and CR numbers, the addresses, the logo blob and the stamp blob. It is also
         the table the statement's own company filter selects from, so the letterhead
         is the company whose movements are being listed, which is the only one that
         can honestly head the sheet.
@@ -312,7 +312,7 @@ class CustomerStatementReportRepository:
         try:
             return self.db.fetch_one(
                 "SELECT id, name_ar, name_en, commercial_registration, vat_number, "
-                "address_ar, address_en, logo, logo_mime "
+                "address_ar, address_en, logo, logo_mime, stamp, stamp_mime "
                 "FROM companies WHERE id = %s",
                 [int(company_id)],
             )

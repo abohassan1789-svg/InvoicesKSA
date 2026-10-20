@@ -765,3 +765,48 @@ def test_move_splits_the_number_off_the_description() -> None:
     assert _move({"description": "فاتورة مبيعات آجلة رقم 985"}) == ("فاتورة مبيعات آجلة", "985")
     assert _move({"description": "سند قبض رقم PA-014"}) == ("سند قبض", "PA-014")
     assert _move({"description": "تسوية", "sales_invoice_number": "-"}) == ("تسوية", "—")
+
+
+# ======================================================================
+# The company stamp (every template, 2026-10-20)
+# ======================================================================
+_STAMP = b"\x89PNG\r\n\x1a\nSTAMP"
+_STAMP_URI = "data:image/png;base64,iVBORw0KGgpTVEFNUA=="
+
+
+def _stamped(**overrides) -> dict:
+    data = _data()
+    data["company"] = {**COMPANY, "stamp": _STAMP, "stamp_mime": "image/png", **overrides}
+    return data
+
+
+@pytest.mark.parametrize("label,build", ALL_BUILDERS)
+def test_a_company_with_a_stamp_prints_it_once(label, build) -> None:
+    html = build(_stamped())
+    assert html.count(_STAMP_URI) == 1, f"{label}: the stamp must print exactly once"
+    # A stamped sheet must not also say it needs no stamp.
+    assert "ولا يحتاج إلى ختم" not in html, label
+    assert "هذا الكشف صادر آلياً من النظام" in html, label
+
+
+@pytest.mark.parametrize("label,build", ALL_BUILDERS)
+def test_the_stamp_sits_after_the_totals_and_before_the_footer_line(label, build) -> None:
+    """In flow, after every row and total, so it can never cover one of them."""
+    html = build(_stamped())
+    stamp = html.index(_STAMP_URI)
+    assert html.rindex("</table>") < stamp, f"{label}: stamp before the table ends"
+    assert stamp < html.index("هذا الكشف صادر آلياً من النظام"), label
+    block = html[html.rindex("<div", 0, stamp):stamp]
+    assert "position" not in block, f"{label}: the stamp must stay in the flow"
+    assert "break-inside:avoid" in block, label
+
+
+@pytest.mark.parametrize("label,build", ALL_BUILDERS)
+def test_no_stamp_prints_exactly_as_before(label, build) -> None:
+    for data in (_data(), _stamped(stamp=None), _stamped(stamp=b"")):
+        html = build(data)
+        assert "co-stamp" not in html, label
+        assert "هذا الكشف صادر آلياً من النظام ولا يحتاج إلى ختم" in html, label
+    everything = _stamped()
+    everything["company"] = None   # «الكل»: no issuing company, so no stamp
+    assert "co-stamp" not in build(everything), label

@@ -122,6 +122,7 @@ from app.ui.screens.saudi_invoice_print import (
     amount_in_words_ar,
     choose_invoice_template,
     company_logo_data_uri,
+    company_stamp_data_uri,
     signature_line_html,
 )
 
@@ -343,14 +344,44 @@ def _empty_note(data: dict[str, Any]) -> str:
     )
 
 
-def _auto_note() -> str:
+def _auto_note(data: dict[str, Any]) -> str:
     """Shared footer line printed at the bottom of every statement template:
     the statement is system-generated and needs no stamp (النموذج الثالث had it;
-    the user asked for it on the other templates too, 2026-08-22)."""
+    the user asked for it on the other templates too, 2026-08-22).
+
+    When the statement's company has a stamp it prints first, via
+    :func:`_stamp`, and the line drops «ولا يحتاج إلى ختم» — a stamped sheet
+    saying it needs no stamp would contradict itself."""
+    stamp = _stamp(data)
+    text = "هذا الكشف صادر آلياً من النظام" if stamp else "هذا الكشف صادر آلياً من النظام ولا يحتاج إلى ختم"
     return (
-        '<div style="margin-top:16px; padding-top:8px; border-top:1px solid #E4E8F3; '
+        stamp
+        + '<div style="margin-top:16px; padding-top:8px; border-top:1px solid #E4E8F3; '
         'display:flex; justify-content:space-between; font-size:9.5px; color:#8189A6;">'
-        "<span>هذا الكشف صادر آلياً من النظام ولا يحتاج إلى ختم</span></div>"
+        f"<span>{text}</span></div>"
+    )
+
+
+def _stamp(data: dict[str, Any]) -> str:
+    """The company stamp, on every template, whenever the company has one (user
+    2026-10-20: «أي شركة ليها ختم عند الطباعة يظهر ختم على طول»).
+
+    It is a block of its own in the document flow, after the totals and the
+    signature and before the footer line, so it can never sit on a row, a total
+    or the signature — the page simply grows by its height, or the block moves to
+    the next page whole (``break-inside:avoid``). It sits at the sheet's physical
+    left, under «التوقيع» on the templates that print one. «الكل» (no company)
+    and a company without a stamp print exactly as before.
+    """
+    company = data.get("company")
+    uri = company_stamp_data_uri(company) if isinstance(company, dict) else ""
+    if not uri:
+        return ""
+    return (
+        '<div class="co-stamp" style="direction:ltr; text-align:left; margin-top:12px; '
+        'padding-left:6px; break-inside:avoid; page-break-inside:avoid; break-before:avoid;">'
+        f'<img src="{uri}" alt="ختم الشركة" style="max-width:140px; max-height:100px; '
+        'width:auto; height:auto; object-fit:contain; display:inline-block;" /></div>'
     )
 
 
@@ -414,7 +445,7 @@ def build_statement_html_v1(data: dict[str, Any]) -> str:
         f'إجمالي الدائن: <span class="num">{_esc(summary.get("total_credit_label"))}</span>'
         "&nbsp;&nbsp;|&nbsp;&nbsp;"
         f'الفرق: <span class="num">{_esc(summary.get("difference_label"))}</span></div>'
-        f"{_auto_note()}",
+        f"{_auto_note(data)}",
         landscape=True,
     )
 
@@ -520,7 +551,7 @@ def build_statement_html_v2(data: dict[str, Any]) -> str:
         f'<div style="display:flex; gap:8px; flex:none;">{cards}</div>'
         "</div>"
         f"{table}{_empty_note(data)}"
-        f"{_auto_note()}",
+        f"{_auto_note(data)}",
         landscape=True,
     )
 
@@ -613,7 +644,7 @@ def build_statement_html_v3(data: dict[str, Any]) -> str:
         'justify-content:flex-end; padding-top:34px;">'
         f'{signature_line_html(font_size="10.5px", color="#6B7290")}'
         "</div></div>"
-        f"{_auto_note()}",
+        f"{_auto_note(data)}",
         landscape=False,
     )
 
@@ -754,7 +785,7 @@ def build_statement_html_v4(data: dict[str, Any]) -> str:
         + box("إجمالي المدين", _esc(s.get("total_debit_label")))
         + box("إجمالي الدائن", _esc(s.get("total_credit_label")))
         + box("الرصيد الختامي", _esc(s.get("difference_label")), dark=True)
-        + "</div>" + table + _empty_note(data) + _auto_note(),
+        + "</div>" + table + _empty_note(data) + _auto_note(data),
         landscape=False,
     )
 
@@ -836,7 +867,7 @@ def build_statement_html_v5(data: dict[str, Any]) -> str:
           '<div style="font-size:11px; font-weight:700; color:#0F172A; margin-bottom:6px;">حركة الحساب شهرياً</div>'
           f'<div style="display:flex; gap:6px;">{bars}</div>{legend}</div></div>'
         + '<div style="font-size:11px; font-weight:700; color:#0F172A; margin-bottom:6px;">تفاصيل الحركات</div>'
-        + table + _empty_note(data) + _auto_note(),
+        + table + _empty_note(data) + _auto_note(data),
         landscape=True,
     )
 
@@ -899,7 +930,7 @@ def build_statement_html_v6(data: dict[str, Any]) -> str:
         + tot("إجمالي المدين", "Total Debit", _esc(s.get("total_debit_label")))
         + tot("إجمالي الدائن", "Total Credit", _esc(s.get("total_credit_label")))
         + tot("الرصيد المستحق", "Balance Due", f'{_esc(s.get("difference_label"))} SAR', strong=True)
-        + "</div></div>" + _auto_note(),
+        + "</div></div>" + _auto_note(data),
         landscape=False,
     )
 
@@ -979,7 +1010,7 @@ def build_statement_html_v7(data: dict[str, Any]) -> str:
           f'{_period(data)}</div></div>'
         + table + _empty_note(data) + aging
         + '<div style="display:flex; justify-content:flex-end; margin-top:18px;">'
-        + signature_line_html(font_size="11px", color="#44403C") + "</div>" + _auto_note(),
+        + signature_line_html(font_size="11px", color="#44403C") + "</div>" + _auto_note(data),
         landscape=False,
     )
 
@@ -1044,7 +1075,7 @@ def build_statement_html_v8(data: dict[str, Any]) -> str:
         + "</div>" + table + _empty_note(data)
         + '<div style="display:flex; justify-content:flex-end; margin-top:26px;">'
         + signature_line_html(font_size="11px", color="#374151") + "</div>"
-        + _auto_note(),
+        + _auto_note(data),
         landscape=False,
     )
 
@@ -1137,7 +1168,7 @@ def build_statement_html_v9(data: dict[str, Any]) -> str:
         + '<div dir="ltr" style="font-size:11px; letter-spacing:3px; color:#5E8F8A; text-align:right; margin-bottom:16px;">STATEMENT OF ACCOUNT</div>'
         + table + _empty_note(data)
         + '<div style="display:flex; justify-content:flex-end; margin-top:24px;">'
-        + signature_line_html(font_size="11px", color="#374151") + "</div>" + _auto_note(),
+        + signature_line_html(font_size="11px", color="#374151") + "</div>" + _auto_note(data),
         landscape=False,
     )
 
@@ -1194,7 +1225,7 @@ def build_statement_html_v10(data: dict[str, Any]) -> str:
     return _document(
         _letterhead(data, accent=a, rule="#EDE9FE") + band
         + f'<div style="display:flex; gap:10px; margin-bottom:14px;">{pills}</div>'
-        + table + _empty_note(data) + _auto_note() + footer,
+        + table + _empty_note(data) + _auto_note(data) + footer,
         landscape=False,
     )
 
@@ -1258,7 +1289,7 @@ def build_statement_html_v11(data: dict[str, Any]) -> str:
         + f'<div style="display:flex; justify-content:space-between; font-weight:700; font-size:11px; margin-top:8px; padding:7px 8px; background:#F3F4F6;">'
           f'<span>الإجمالي</span><span>مدين <span class="num">{_esc(s.get("total_debit_label"))}</span> &nbsp;|&nbsp; '
           f'دائن <span class="num">{_esc(s.get("total_credit_label"))}</span></span></div>'
-        + _auto_note(),
+        + _auto_note(data),
         landscape=False,
     )
 
@@ -1342,7 +1373,7 @@ def build_statement_html_v12(data: dict[str, Any]) -> str:
         + f'<div style="text-align:left; font-size:11.5px; font-weight:700; margin-top:10px;">'
           f'مدين <span class="num">{_esc(s.get("total_debit_label"))}</span> · دائن <span class="num">{_esc(s.get("total_credit_label"))}</span> · '
           f'<span style="color:{accent};">الرصيد المستحق <span class="num">{_esc(s.get("difference_label"))}</span></span></div>'
-        + _auto_note(),
+        + _auto_note(data),
         landscape=False,
     )
 
@@ -1413,7 +1444,7 @@ def build_statement_html_v13(data: dict[str, Any]) -> str:
           f'<span>إجمالي الدائن: <span class="num">{_esc(s.get("total_credit_label"))}</span></span></div>'
         + amount_box
         + '<div style="display:flex; justify-content:flex-end; margin-top:20px;">'
-        + signature_line_html(font_size="11px", color=deep) + "</div>" + _auto_note(),
+        + signature_line_html(font_size="11px", color=deep) + "</div>" + _auto_note(data),
         landscape=False,
     )
 
@@ -1545,7 +1576,7 @@ def build_statement_html_v14(data: dict[str, Any]) -> str:
     )
     return _document(
         css + _letterhead(data, accent=ink, rule=copper) + title + parties
-        + table + _empty_note(data) + vat_box + _auto_note(),
+        + table + _empty_note(data) + vat_box + _auto_note(data),
         landscape=False,
     )
 
@@ -1645,7 +1676,7 @@ def build_statement_html_v15(data: dict[str, Any]) -> str:
         + f'<div class="top">{sender}{window}</div>'
         + f'<div style="font-size:20px; font-weight:700; color:{ink};">{_esc(data.get("title"))}</div>'
         + f'<div style="font-size:11px; color:#5C6A6E;">عن الفترة {_period(data)}</div>'
-        + summary + _plain_table(data, rule=rule, ink=ink) + _empty_note(data) + _auto_note(),
+        + summary + _plain_table(data, rule=rule, ink=ink) + _empty_note(data) + _auto_note(data),
         landscape=False,
     )
 
@@ -1735,7 +1766,7 @@ def build_statement_html_v16(data: dict[str, Any]) -> str:
         + '<div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:4px 14px; margin-bottom:10px;">'
           f'<div style="font-size:19px; font-weight:700; color:{olive};">{_esc(data.get("title"))}</div>'
           f'<div style="font-size:11px; color:#5F6B56;">{_customer(data)}</div></div>'
-        + period + table + _empty_note(data) + totals + _auto_note()
+        + period + table + _empty_note(data) + totals + _auto_note(data)
         + _HIJRI_SCRIPT % ("[" + ",".join(f'"{m}"' for m in _HIJRI_MONTHS) + "]"),
         landscape=False,
     )
@@ -1853,7 +1884,7 @@ def build_statement_html_v17(data: dict[str, Any]) -> str:
         + f'<div style="text-align:left; font-size:11.5px; font-weight:700; margin-top:8px;">'
           f'مدين <span class="num">{_esc(s.get("total_debit_label"))}</span> · دائن <span class="num">{_esc(s.get("total_credit_label"))}</span> · '
           f'<span style="color:{blue};">الرصيد المستحق <span class="num">{_esc(s.get("difference_label"))}</span></span></div>'
-        + _auto_note(),
+        + _auto_note(data),
         landscape=False,
     )
 
@@ -1977,7 +2008,7 @@ def _fixed_statement(data: dict[str, Any], theme: str, css: str) -> str:
     ) if body else ""
     return _document(
         _style(_FIXED_CSS + css)
-        + f'<div class="fx {theme}">{head}{cust}{period}{cards}{table}{_empty_note(data)}{_auto_note()}</div>',
+        + f'<div class="fx {theme}">{head}{cust}{period}{cards}{table}{_empty_note(data)}{_auto_note(data)}</div>',
         landscape=False,
     )
 

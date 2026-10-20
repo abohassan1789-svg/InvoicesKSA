@@ -206,6 +206,17 @@ from app.ui.screens.saudi_receipt_voucher_print import (  # noqa: E402
 from app.ui.screens.saudi_receipt_voucher_print_v10 import build_receipt_voucher_html_v10  # noqa: E402
 from app.ui.screens.saudi_receipt_voucher_print_v11 import build_receipt_voucher_html_v11  # noqa: E402
 from app.ui.screens.saudi_receipt_voucher_print_v12 import build_receipt_voucher_html_v12  # noqa: E402
+from app.ui.screens.saudi_receipt_voucher_print_gallery import (  # noqa: E402
+    GALLERY_VOUCHER_TEMPLATES,
+    build_receipt_voucher_html_bronze,
+    build_receipt_voucher_html_panel,
+    build_receipt_voucher_html_slant,
+    build_receipt_voucher_html_slip,
+    build_receipt_voucher_html_swiss,
+    build_receipt_voucher_html_tiles,
+    build_receipt_voucher_html_tinted,
+    build_receipt_voucher_html_wave,
+)
 from app.ui.screens.saudi_voucher_print_phase1 import (  # noqa: E402
     build_phase1_voucher_html,
     build_phase1_voucher_html_v2,
@@ -229,6 +240,15 @@ _VOUCHER_EXPECTED = {
     13: build_receipt_voucher_html_v10,  # «سند عقيل»
     14: build_receipt_voucher_html_v11,  # «سند الامل»
     15: build_receipt_voucher_html_v12,  # «سند القصر»
+    # 16–23: the eight 2026-10-20 gallery picks.
+    16: build_receipt_voucher_html_slant,
+    17: build_receipt_voucher_html_panel,
+    18: build_receipt_voucher_html_wave,
+    19: build_receipt_voucher_html_tiles,
+    20: build_receipt_voucher_html_bronze,
+    21: build_receipt_voucher_html_tinted,
+    22: build_receipt_voucher_html_slip,
+    23: build_receipt_voucher_html_swiss,
 }
 
 
@@ -283,7 +303,7 @@ def test_phase1_rosters_are_complete():
     assert len(PHASE1_TEMPLATE_OPTIONS) == len(_PHASE1_BUILDERS) == 22
     for hidden in _HIDDEN_REPLICAS:
         assert hidden not in PHASE1_TEMPLATE_OPTIONS
-    assert len(PHASE1_VOUCHER_TEMPLATE_OPTIONS) == len(_PHASE1_VOUCHER_BUILDERS) == 12
+    assert len(PHASE1_VOUCHER_TEMPLATE_OPTIONS) == len(_PHASE1_VOUCHER_BUILDERS) == 20
 
 
 def test_phase1_voucher_7to9_reuse_phase2_designs():
@@ -452,10 +472,56 @@ def test_amal_voucher_in_both_pickers():
 
 
 def test_qasr_voucher_in_both_pickers():
-    """«سند القصر» is the last option of BOTH voucher pickers, same builder."""
-    assert VOUCHER_TEMPLATE_OPTIONS[-1] == "سند القصر"
-    assert PHASE1_VOUCHER_TEMPLATE_OPTIONS[-1] == "سند القصر"
+    """«سند القصر» is in BOTH voucher pickers, same builder."""
+    assert VOUCHER_TEMPLATE_OPTIONS[14] == "سند القصر"
+    assert PHASE1_VOUCHER_TEMPLATE_OPTIONS[11] == "سند القصر"
     assert phase1_voucher_builder_for(12) is build_receipt_voucher_html_v12
+
+
+def test_gallery_vouchers_close_both_pickers():
+    """The eight 2026-10-20 gallery picks end BOTH voucher pickers, in the gallery
+    roster's order, each label reaching the same builder in both."""
+    labels = tuple(label for label, _builder in GALLERY_VOUCHER_TEMPLATES)
+    assert len(labels) == 8
+    assert VOUCHER_TEMPLATE_OPTIONS[15:] == labels
+    assert PHASE1_VOUCHER_TEMPLATE_OPTIONS[12:] == labels
+    for i, (_label, builder) in enumerate(GALLERY_VOUCHER_TEMPLATES):
+        assert phase1_voucher_builder_for(13 + i) is builder
+        assert _VOUCHER_EXPECTED[16 + i] is builder
+
+
+_GALLERY_DATA = {
+    "number": "172", "amount": "12486.75", "received_from": "شركة النقيب للإنارة الحديثة",
+    "reference": "877", "purpose": "دفعة من قيمة فاتورة المبيعات رقم 877",
+    "seller": {"name": "شركة زيادة البركة التجارية", "cr": "7009631370", "vat": "311369317100003",
+               "address": "جدة - العزيزية"},
+}
+
+
+@pytest.mark.parametrize("label, builder", GALLERY_VOUCHER_TEMPLATES)
+def test_gallery_voucher_prints_every_requested_field(label, builder):
+    """Seller + logo slot on top; customer, amount (figures + words in riyals and
+    halalas), the sales invoice number and the purpose; the signature line."""
+    import datetime
+
+    import re
+
+    html = builder({**_GALLERY_DATA, "issue_date": datetime.date(2026, 10, 20)})
+    # Read it as printed text: «سند<br>قبض» and the one-digit-per-box slip.
+    html = re.sub(r"<[^>]+>", "", html.replace("<br>", " "))
+    for needle in ("شركة زيادة البركة التجارية", "7009631370", "311369317100003", "الشعار",
+                   "سند قبض", "172", "20/10/2026", "شركة النقيب للإنارة الحديثة",
+                   "ريالاً سعودياً", "هللة", "877", "دفعة من قيمة فاتورة المبيعات", "التوقيع"):
+        assert needle in html, (label, needle)
+    assert "12,486.75" in html or "12486.75" in html, label
+
+
+@pytest.mark.parametrize("label, builder", GALLERY_VOUCHER_TEMPLATES)
+def test_gallery_voucher_without_invoice_number_prints_a_dash(label, builder):
+    """The vouchers screen passes no ``reference``: رقم فاتورة البيع shows «—»."""
+    data = {k: v for k, v in _GALLERY_DATA.items() if k != "reference"}
+    data["purpose"] = ""
+    assert "—" in builder(data), label
 
 
 @pytest.mark.parametrize("payment, ticked", [("نقدي", "cash"), ("شيك", "cheque"), ("تحويل", "transfer"), ("", None)])

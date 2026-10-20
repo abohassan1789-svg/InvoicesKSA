@@ -1476,6 +1476,17 @@ VOUCHER_TEMPLATE_OPTIONS: tuple[str, ...] = (
     "سند الامل",
     # «سند القصر» — layout replica of قصر نصار's bilingual voucher scan (2026-10-06).
     "سند القصر",
+    # 16–23: the eight layouts the user chose from the 2026-10-20 voucher gallery
+    # (saudi_receipt_voucher_print_gallery). Same labels, same order as its
+    # GALLERY_VOUCHER_TEMPLATES roster — a test keeps the two in step.
+    "سند الزاوية المائلة",
+    "سند اللوحة المركزية",
+    "سند الترويسة الموجية",
+    "سند البطاقات الأربع",
+    "سند الزوايا البرونزية",
+    "سند النصف الملون",
+    "سند قسيمة الإيداع",
+    "سند الشبكة السويسرية",
 )
 
 
@@ -1499,6 +1510,7 @@ def choose_voucher_builder(
     from app.ui.screens.saudi_invoice_print import choose_invoice_template
     from app.ui.screens.saudi_receipt_voucher_print_v10 import build_receipt_voucher_html_v10
     from app.ui.screens.saudi_receipt_voucher_print_v11 import build_receipt_voucher_html_v11
+    from app.ui.screens.saudi_receipt_voucher_print_gallery import GALLERY_VOUCHER_TEMPLATES
     from app.ui.screens.saudi_receipt_voucher_print_v12 import build_receipt_voucher_html_v12
     from app.ui.screens.saudi_voucher_print_phase1 import (
         build_phase1_voucher_html,
@@ -1509,6 +1521,7 @@ def choose_voucher_builder(
     choice = choose_invoice_template(parent, action_label, VOUCHER_TEMPLATE_OPTIONS, orientation="vertical")
     if choice is None:
         return None
+    gallery = {16 + i: builder for i, (_label, builder) in enumerate(GALLERY_VOUCHER_TEMPLATES)}
     return {
         1: build_receipt_voucher_html,
         2: build_receipt_voucher_html_v2,
@@ -1525,6 +1538,7 @@ def choose_voucher_builder(
         13: build_receipt_voucher_html_v10, # «سند عقيل»
         14: build_receipt_voucher_html_v11, # «سند الامل»
         15: build_receipt_voucher_html_v12, # «سند القصر»
+        **gallery,                          # 16–23: the 2026-10-20 gallery picks
     }.get(choice, build_receipt_voucher_html)
 
 # ======================================================================

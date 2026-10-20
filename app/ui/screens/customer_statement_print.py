@@ -1,4 +1,4 @@
-"""Printable Customer Statement (كشف حساب العميل) — fourteen templates.
+"""Printable Customer Statement (كشف حساب العميل) — seventeen templates.
 
 Approved in-conversation 2026-07-16. The screen offers the same template picker
 the sales-invoice screen uses, on معاينة / طباعة / تصدير PDF:
@@ -52,6 +52,15 @@ mock-up's QR code:
 * :func:`build_statement_html_v14` — «النموذج الرابع عشر», الكشف الضريبي المفصّل:
   supplier and customer VAT identities, each invoice split into taxable amount,
   15% VAT and total, a running balance and a VAT summary. Portrait.
+
+النموذج الخامس عشر → السابع عشر were picked the same day from a fourth batch of fifteen:
+
+* :func:`build_statement_html_v15` — «النموذج الخامس عشر», ظرف النافذة: the
+  customer's address placed for a DL window envelope, fold marks. Portrait.
+* :func:`build_statement_html_v16` — «النموذج السادس عشر», هجري وميلادي: every
+  movement dated in both calendars (Umm al-Qura) with its weekday. Portrait.
+* :func:`build_statement_html_v17` — «النموذج السابع عشر», ملف العميل: a customer
+  profile with a payment rating and days-to-settle per invoice. Portrait.
 
 Why this module renders through ``QWebEngineView`` and not the shared
 ``PrintManager`` / ``PdfExporter`` the report used before
@@ -140,6 +149,9 @@ STATEMENT_TEMPLATE_OPTIONS: tuple[str, ...] = (
     "النموذج الثاني عشر",
     "النموذج الثالث عشر",
     "النموذج الرابع عشر",
+    "النموذج الخامس عشر",
+    "النموذج السادس عشر",
+    "النموذج السابع عشر",
 )
 
 _ZERO = Decimal("0.00")
@@ -1528,6 +1540,314 @@ build_statement_html_v14.landscape = False  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
+# Helpers shared by النموذج الخامس عشر → السابع عشر (added 2026-10-20)
+# ---------------------------------------------------------------------------
+def _plain_table(data: dict[str, Any], *, rule: str, ink: str, extra: tuple = ()) -> str:
+    """التاريخ / [extra columns] / البيان / مدين / دائن / الرصيد. ``extra`` is a
+    tuple of (header, width, cell(row) -> html) inserted after the date."""
+    narrow = bool(extra)
+    cols = (("التاريخ", "11%" if narrow else "13%", "center"),) + tuple((h, w, "center") for h, w, _ in extra) + (
+        ("البيان", "auto", "right"), ("مدين", "13%" if narrow else "15%", "center"),
+        ("دائن", "13%" if narrow else "15%", "center"), ("الرصيد", "16%" if narrow else "17%", "center"))
+    head = "".join(
+        f'<th style="padding:6px 4px; border-bottom:1.5px solid {ink}; color:{ink}; width:{w}; text-align:{al};">{t}</th>'
+        for t, w, al in cols)
+    body = "".join(
+        f'<tr><td style="padding:5px 4px; text-align:center; border-bottom:1px solid {rule};">{_esc(r.get("transaction_date"))}</td>'
+        + "".join(f'<td style="text-align:center; border-bottom:1px solid {rule};">{cell(r)}</td>' for _, _, cell in extra)
+        + f'<td style="padding:5px 6px; border-bottom:1px solid {rule};">{_esc(r.get("description"))}</td>'
+        f'<td style="text-align:center; border-bottom:1px solid {rule};">{_amt(r.get("debit"))}</td>'
+        f'<td style="text-align:center; border-bottom:1px solid {rule};">{_amt(r.get("credit"))}</td>'
+        f'<td style="text-align:center; font-weight:700; border-bottom:1px solid {rule};">{_bal(b)}</td></tr>'
+        for r, b in rows_with_balance(_rows(data)))
+    return (f'<table style="font-size:10.5px;"><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
+            if body else "")
+
+
+def _statement_ref(data: dict[str, Any]) -> str:
+    """«رقم الكشف», as النموذج الثامن prints it: customer id + closing month."""
+    customer_id = data.get("customer_id")
+    to_month = str(data.get("date_to_label") or "").replace("-", "")[:6]
+    return f"ST-{customer_id}-{to_month}" if customer_id and to_month.isdigit() else "—"
+
+
+# ---------------------------------------------------------------------------
+# النموذج الخامس عشر — ظرف النافذة (address in a DL window, fold marks). Portrait
+# ---------------------------------------------------------------------------
+def build_statement_html_v15(data: dict[str, Any]) -> str:
+    """For posting: the customer's address sits where a DL window envelope
+    shows it, and two fold marks on the edge fold the sheet in three.
+
+    Paper geometry (A4, 12mm printed margin): a DL window is ~90×45mm, 20mm from
+    the left and ~50mm from the top of the folded sheet; the folds are at 99mm
+    and 198mm. In the sheet's own coordinates that is the margin less: the
+    window at 38mm / 8mm, the marks at 87mm / 186mm. On screen the same mm hold.
+    """
+    ink, rule = "#1F2A2E", "#EEF1F2"
+    s = _summary(data)
+    company = data.get("company") or {}
+    customer = data.get("customer") or {}
+    logo = company_logo_data_uri(company) if company else ""
+    css = _style(f"""
+      .sheet {{ position:relative; }}
+      @media print {{ .sheet {{ padding:0 !important; }} }}
+      .fold {{ position:absolute; right:0; width:5mm; border-top:0.3mm solid #9AA5A9; }}
+      .win {{ position:absolute; top:38mm; left:8mm; width:90mm; height:45mm; padding:4mm 5mm;
+              font-size:12px; line-height:1.7; overflow:hidden; }}
+      .win small {{ display:block; font-size:8px; color:#7C898D; border-bottom:0.2mm solid #DDE2E4;
+                    margin-bottom:1.5mm; padding-bottom:0.5mm; white-space:nowrap; overflow:hidden; }}
+      .top {{ height:86mm; }}
+    """)
+    name = _esc(customer.get("customer_name") or data.get("customer_label") or "الكل")
+    window = (
+        '<div class="win">'
+        + (f'<small>{_esc(company.get("name_ar"))}{" · " + _esc(company.get("address_ar")) if company.get("address_ar") else ""}</small>'
+           if company else "")
+        + f'<b>السادة / {name}</b>'
+        + (f'<div>{_esc(customer.get("address"))}</div>' if customer.get("address") else "")
+        + '<div>المملكة العربية السعودية</div></div>'
+    )
+    sender = (
+        '<div style="width:46%; font-size:10.5px; line-height:1.75; color:#5C6A6E;">'
+        + (f'<img src="{logo}" alt="logo" style="max-width:120px; max-height:52px; display:block; margin-bottom:6px;">' if logo else "")
+        + (f'<div style="font-size:15px; font-weight:700; color:{ink};">{_esc(company.get("name_ar"))}</div>' if company else "")
+        + (f'<div dir="ltr" style="text-align:right;">{_esc(company.get("name_en"))}</div>' if company.get("name_en") else "")
+        + (f'<div>{_esc(company.get("address_ar"))}</div>' if company.get("address_ar") else "")
+        + (f'<div>الرقم الضريبي: <span class="num">{_esc(company.get("vat_number"))}</span></div>' if company.get("vat_number") else "")
+        + (f'<div>السجل التجاري: <span class="num">{_esc(company.get("commercial_registration"))}</span></div>' if company.get("commercial_registration") else "")
+        + f'<div style="margin-top:10px;">رقم الكشف: <span class="num">{_statement_ref(data)}</span></div></div>'
+    )
+    summary = (
+        f'<div style="display:flex; gap:32px; font-size:10.5px; color:#5C6A6E; margin:8px 0 10px; padding:7px 0; '
+        f'border-top:1px solid {ink}; border-bottom:1px solid {ink};">'
+        + "".join(f'<div>{lbl}<div class="num" style="font-size:15px; font-weight:700; color:{ink};">{_esc(v)}</div></div>'
+                  for lbl, v in (("إجمالي المدين", s.get("total_debit_label")),
+                                 ("إجمالي الدائن", s.get("total_credit_label")),
+                                 ("الرصيد المستحق", s.get("difference_label"))))
+        + "</div>"
+    )
+    return _document(
+        css + '<div class="fold" style="top:87mm;"></div><div class="fold" style="top:186mm;"></div>'
+        + f'<div class="top">{sender}{window}</div>'
+        + f'<div style="font-size:20px; font-weight:700; color:{ink};">{_esc(data.get("title"))}</div>'
+        + f'<div style="font-size:11px; color:#5C6A6E;">عن الفترة {_period(data)}</div>'
+        + summary + _plain_table(data, rule=rule, ink=ink) + _empty_note(data) + _auto_note(),
+        landscape=False,
+    )
+
+
+build_statement_html_v15.landscape = False  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# النموذج السادس عشر — هجري وميلادي (both calendars + weekday). Portrait
+# ---------------------------------------------------------------------------
+_HIJRI_MONTHS = ("محرم", "صفر", "ربيع الأول", "ربيع الآخر", "جمادى الأولى", "جمادى الآخرة",
+                 "رجب", "شعبان", "رمضان", "شوال", "ذو القعدة", "ذو الحجة")
+_WEEKDAYS = ("الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت", "الأحد")
+
+# Umm al-Qura — the calendar Saudi Arabia uses — is observational and ships with
+# Chromium's ICU, so the page fills each Hijri date in through Intl at load
+# time (QWebEngine runs the script before loadFinished, i.e. before print/PDF).
+# The text under it is Qt's tabular (civil) Hijri date, which can differ by a
+# day; it is only what shows if script were ever off.
+_HIJRI_SCRIPT = """<script>
+(function(){
+  var months = %s;
+  var fmt; try { fmt = new Intl.DateTimeFormat('en-US-u-ca-islamic-umalqura',
+      {day:'numeric', month:'numeric', year:'numeric', timeZone:'UTC'}); } catch (e) { return; }
+  document.querySelectorAll('[data-hijri]').forEach(function(el){
+    var p = {}; fmt.formatToParts(new Date(el.getAttribute('data-hijri') + 'T00:00:00Z'))
+      .forEach(function(x){ p[x.type] = x.value; });
+    var y = String(p.year).replace(/\\D/g, ''), m = +p.month, d = +p.day;
+    if (!y || !m || !d) return;
+    el.textContent = el.hasAttribute('data-long')
+      ? d + ' ' + months[m - 1] + ' ' + y + 'هـ'
+      : y + '/' + (m < 10 ? '0' : '') + m + '/' + (d < 10 ? '0' : '') + d;
+  });
+})();
+</script>"""
+
+
+def _hijri(value: Any, *, long: bool = False) -> str:
+    """A Hijri date for a Gregorian «YYYY-MM-DD», as a span the page's script
+    upgrades to Umm al-Qura; «—» for an unreadable date."""
+    d = _parse(value)
+    if not d:
+        return "—"
+    from PySide6.QtCore import QCalendar, QDate  # noqa: PLC0415 - local, rarely used
+    parts = QCalendar(QCalendar.System.IslamicCivil).partsFromDate(QDate(d.year, d.month, d.day))
+    text = (f"{parts.day} {_HIJRI_MONTHS[parts.month - 1]} {parts.year}هـ" if long
+            else f"{parts.year}/{parts.month:02d}/{parts.day:02d}")
+    # The numeric form is isolated LTR like every other date; the long form is
+    # Arabic words and must stay RTL, or «16 محرم 1448هـ» prints reordered.
+    style = "" if long else ' style="display:inline-block; direction:ltr; unicode-bidi:isolate;"'
+    return f'<span data-hijri="{d.isoformat()}"{" data-long" if long else ""}{style}>{text}</span>'
+
+
+def build_statement_html_v16(data: dict[str, Any]) -> str:
+    """Every movement dated in both calendars — Gregorian and Hijri (Umm al-Qura)
+    — with its weekday, and the period stated in both."""
+    olive, rule = "#4B5E3C", "#E7EBE2"
+    s = _summary(data)
+    period = (
+        '<div style="display:grid; grid-template-columns:1fr 1fr; border:1px solid #CBD3C3; '
+        'border-radius:6px; overflow:hidden; margin-bottom:12px;">'
+        '<div style="padding:7px 12px; font-size:10.5px; color:#5F6B56;">الفترة بالتاريخ الميلادي'
+        f'<div style="font-size:12.5px; font-weight:700; color:#26301F;">{_period(data)}</div></div>'
+        '<div style="padding:7px 12px; font-size:10.5px; color:#5F6B56; background:#F3F5EF; border-right:1px solid #CBD3C3;">'
+        'الفترة بالتاريخ الهجري (أم القرى)'
+        f'<div style="font-size:12.5px; font-weight:700; color:#26301F;">من {_hijri(data.get("date_from_label"), long=True)} '
+        f'إلى {_hijri(data.get("date_to_label"), long=True)}</div></div></div>'
+    )
+
+    def weekday(r: dict[str, Any]) -> str:
+        d = _parse(r.get("transaction_date"))
+        return _WEEKDAYS[d.weekday()] if d else "—"
+
+    table = _plain_table(data, rule=rule, ink=olive, extra=(
+        ("هجري", "11%", lambda r: f'<b style="color:{olive};">{_hijri(r.get("transaction_date"))}</b>'),
+        ("اليوم", "8%", weekday),
+    ))
+    totals = (
+        f'<div style="display:flex; justify-content:flex-end; gap:22px; font-size:11.5px; font-weight:700; '
+        f'margin-top:8px; padding:7px 8px; background:#F3F5EF; border-top:1.5px solid {olive};">'
+        f'<span>مدين <span class="num">{_esc(s.get("total_debit_label"))}</span></span>'
+        f'<span>دائن <span class="num">{_esc(s.get("total_credit_label"))}</span></span>'
+        f'<span style="color:{olive};">الرصيد المستحق <span class="num">{_esc(s.get("difference_label"))}</span></span></div>'
+    ) if _rows(data) else ""
+    return _document(
+        _letterhead(data, accent=olive, rule=olive)
+        + '<div style="display:flex; flex-wrap:wrap; justify-content:space-between; align-items:baseline; gap:4px 14px; margin-bottom:10px;">'
+          f'<div style="font-size:19px; font-weight:700; color:{olive};">{_esc(data.get("title"))}</div>'
+          f'<div style="font-size:11px; color:#5F6B56;">{_customer(data)}</div></div>'
+        + period + table + _empty_note(data) + totals + _auto_note()
+        + _HIJRI_SCRIPT % ("[" + ",".join(f'"{m}"' for m in _HIJRI_MONTHS) + "]"),
+        landscape=False,
+    )
+
+
+build_statement_html_v16.landscape = False  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
+# النموذج السابع عشر — ملف العميل (profile, payment behaviour, then the table). Portrait
+# ---------------------------------------------------------------------------
+_NAME_PREFIXES = ("شركة", "مؤسسة", "مصنع", "محلات", "مكتب", "مجموعة")
+
+
+def _settlement_days(data: dict[str, Any]) -> list[int | None]:
+    """Days each debit (invoice) row took to be settled, in statement order —
+    FIFO, every credit settling the oldest open debit first, like النموذج
+    السابع's aging. ``None`` for a debit still open at the period's end."""
+    open_items: list[list] = []          # [date, remaining, index]
+    days: list[int | None] = []
+    for r in _rows(data):
+        d = _parse(r.get("transaction_date"))
+        debit, credit = _d(r.get("debit")), _d(r.get("credit"))
+        if debit:
+            open_items.append([d, debit, len(days)])
+            days.append(None)
+        while credit and open_items:
+            item = open_items[0]
+            take = min(credit, item[1])
+            item[1] -= take
+            credit -= take
+            if not item[1]:
+                days[item[2]] = (d - item[0]).days if d and item[0] else 0
+                open_items.pop(0)
+    return days
+
+
+def _initial(name: str) -> str:
+    words = [w for w in name.split() if w not in _NAME_PREFIXES] or name.split() or ["؟"]
+    word = words[0]
+    if word.startswith("ال") and len(word) > 2:
+        word = word[2:]
+    return word[:1]
+
+
+def build_statement_html_v17(data: dict[str, Any]) -> str:
+    """A customer profile on top — initial, name, CR / VAT / address, a payment
+    rating from the average days to settle, five facts and a coloured square
+    per invoice with its days to settle — then the statement table."""
+    blue, ink, rule = "#1D6A8A", "#1C2B33", "#EDF2F5"
+    s = _summary(data)
+    customer = data.get("customer") or {}
+    name = str(customer.get("customer_name") or data.get("customer_label") or "الكل")
+    rows = _rows(data)
+    days = _settlement_days(data)
+    settled = [d for d in days if d is not None]
+    avg = round(sum(settled) / len(settled)) if settled else None
+    if avg is None:
+        rating, fg, bg = "لا توجد فواتير مسددة في الفترة", "#617480", "#EDF2F5"
+    elif avg <= 30:
+        rating, fg, bg = f"منتظم في السداد · متوسط {avg} يومًا", "#1E6B53", "#E3F1EC"
+    elif avg <= 60:
+        rating, fg, bg = f"سداد متأخر أحيانًا · متوسط {avg} يومًا", "#8A5A0B", "#FBF0DC"
+    else:
+        rating, fg, bg = f"سداد متأخر · متوسط {avg} يومًا", "#9B2C1C", "#FBE5E1"
+    peak = max((b for _, b in rows_with_balance(rows)), default=_ZERO)
+    ids = "".join(
+        f'<span style="margin-left:16px;">{lbl} <b class="num" style="color:{ink}; font-weight:400;">{_esc(v)}</b></span>'
+        for lbl, v in (("السجل التجاري", customer.get("cr")), ("الرقم الضريبي", customer.get("vat_number"))) if v
+    ) + (f'<span>{_esc(customer.get("address"))}</span>' if customer.get("address") else "")
+    profile = (
+        '<div style="display:grid; grid-template-columns:76px 1fr; gap:16px; align-items:center; margin:4px 0 12px;">'
+        f'<div style="width:76px; height:76px; border-radius:50%; background:{blue}; color:#fff; font-size:34px; '
+        f'font-weight:700; display:flex; align-items:center; justify-content:center;">{_esc(_initial(name))}</div>'
+        f'<div><div style="font-size:20px; font-weight:700; color:{ink};">{_esc(name)}</div>'
+        f'<div style="font-size:10.5px; color:#617480; margin-top:3px;">{ids}</div>'
+        f'<span style="display:inline-block; margin-top:6px; font-size:10px; background:{bg}; color:{fg}; '
+        f'border-radius:999px; padding:2px 12px;">{rating}</span></div></div>'
+    )
+    facts = (
+        '<div style="display:grid; grid-template-columns:repeat(5, 1fr); border:1px solid #D9E2E7; border-radius:8px; margin-bottom:10px;">'
+        + "".join(
+            f'<div style="padding:7px 10px; font-size:9.5px; color:#617480;{" border-left:1px solid #D9E2E7;" if i < 4 else ""}">{lbl}'
+            f'<div class="num" style="font-size:13px; font-weight:700; color:{ink}; text-align:right;">{v}</div></div>'
+            for i, (lbl, v) in enumerate((
+                ("عدد الفواتير", len(days)),
+                ("إجمالي المدين", _esc(s.get("total_debit_label"))),
+                ("عدد الدفعات", sum(1 for r in rows if _d(r.get("credit")))),
+                ("أعلى رصيد", _money(peak)),
+                ("الرصيد المستحق", _esc(s.get("difference_label"))),
+            )))
+        + "</div>"
+    )
+
+    def square(d: int | None) -> str:
+        colour = "#94A3B8" if d is None else "#1E6B53" if d <= 20 else "#C58A1B" if d <= 30 else "#B4432F"
+        return (f'<span style="display:inline-block; min-width:20px; height:20px; line-height:20px; border-radius:4px; '
+                f'background:{colour}; color:#fff; font-size:8.5px; text-align:center; margin-left:3px;">'
+                f'{"مفتوحة" if d is None else d}</span>')
+
+    squares = (
+        '<div style="font-size:9.5px; color:#617480; margin-bottom:12px; line-height:2;">مدة سداد كل فاتورة بالأيام: '
+        + "".join(square(d) for d in days) + "</div>"
+    ) if days else ""
+    company = data.get("company") or {}
+    top = (
+        f'<div style="display:flex; justify-content:space-between; font-size:10.5px; color:#617480; '
+        f'border-bottom:1px solid #D9E2E7; padding-bottom:7px; margin-bottom:6px;">'
+        f'<span><b style="color:{ink};">{_esc(company.get("name_ar") or data.get("company_label") or "")}</b> · {_esc(data.get("title"))}</span>'
+        f'<span>{_period(data)}</span></div>'
+    )
+    return _document(
+        _letterhead(data, accent=blue, rule="#D9E2E7") + top + profile + facts + squares
+        + _plain_table(data, rule=rule, ink=ink) + _empty_note(data)
+        + f'<div style="text-align:left; font-size:11.5px; font-weight:700; margin-top:8px;">'
+          f'مدين <span class="num">{_esc(s.get("total_debit_label"))}</span> · دائن <span class="num">{_esc(s.get("total_credit_label"))}</span> · '
+          f'<span style="color:{blue};">الرصيد المستحق <span class="num">{_esc(s.get("difference_label"))}</span></span></div>'
+        + _auto_note(),
+        landscape=False,
+    )
+
+
+build_statement_html_v17.landscape = False  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
 # Dispatch + page layout
 # ---------------------------------------------------------------------------
 _BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
@@ -1545,6 +1865,9 @@ _BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     12: build_statement_html_v12,
     13: build_statement_html_v13,
     14: build_statement_html_v14,
+    15: build_statement_html_v15,
+    16: build_statement_html_v16,
+    17: build_statement_html_v17,
 }
 
 
@@ -1555,7 +1878,7 @@ def choose_statement_builder(
 
     Reuses the sales-invoice picker dialog rather than growing a second one — it
     already takes its options as an argument. Thirteen options (2026-10-18), and
-    fourteen since 2026-10-20, are too many for its default single row, so they
+    seventeen since 2026-10-20, are too many for its default single row, so they
     go in its two-column grid.
     """
     choice = choose_invoice_template(
@@ -1820,6 +2143,9 @@ __all__ = [
     "build_statement_html_v12",
     "build_statement_html_v13",
     "build_statement_html_v14",
+    "build_statement_html_v15",
+    "build_statement_html_v16",
+    "build_statement_html_v17",
     "choose_statement_builder",
     "statement_page_layout",
     "rows_with_balance",

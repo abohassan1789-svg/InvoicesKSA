@@ -1,4 +1,4 @@
-"""The fourteen Customer Statement print templates (كشف حساب العميل).
+"""The seventeen Customer Statement print templates (كشف حساب العميل).
 
 Added 2026-07-16 with the templates themselves. These are string/logic checks over
 the built HTML, so they run headless; the printed geometry, the A4 orientations
@@ -30,6 +30,10 @@ from app.ui.screens.customer_statement_print import (
     build_statement_html_v12,
     build_statement_html_v13,
     build_statement_html_v14,
+    build_statement_html_v15,
+    build_statement_html_v16,
+    build_statement_html_v17,
+    _settlement_days,
     rows_with_balance,
 )
 
@@ -59,10 +63,18 @@ SECOND_BUILDERS = [
 THIRD_BUILDERS = [
     ("النموذج الرابع عشر", build_statement_html_v14),
 ]
-ALL_BUILDERS = BUILDERS + NEW_BUILDERS + SECOND_BUILDERS + THIRD_BUILDERS
+# The fourth pick, same day, from fifteen more mock-ups.
+FOURTH_BUILDERS = [
+    ("النموذج الخامس عشر", build_statement_html_v15),
+    ("النموذج السادس عشر", build_statement_html_v16),
+    ("النموذج السابع عشر", build_statement_html_v17),
+]
+ALL_BUILDERS = BUILDERS + NEW_BUILDERS + SECOND_BUILDERS + THIRD_BUILDERS + FOURTH_BUILDERS
 # Every template but النموذج التاسع, which carries the identity in its side
-# column instead of the three-column letterhead.
-LETTERHEAD_BUILDERS = [b for b in ALL_BUILDERS if b[1] is not build_statement_html_v9]
+# column instead of the three-column letterhead, and النموذج الخامس عشر, whose
+# top is the sender block beside the envelope window.
+LETTERHEAD_BUILDERS = [b for b in ALL_BUILDERS
+                       if b[1] not in (build_statement_html_v9, build_statement_html_v15)]
 
 
 def _header_labels(html_text: str) -> list[str]:
@@ -407,7 +419,8 @@ def test_orientation_is_declared_per_template() -> None:
     assert build_statement_html_v7.landscape is False
     assert build_statement_html_v8.landscape is False
     for build in (build_statement_html_v9, build_statement_html_v10, build_statement_html_v11,
-                  build_statement_html_v12, build_statement_html_v13, build_statement_html_v14):
+                  build_statement_html_v12, build_statement_html_v13, build_statement_html_v14,
+                  build_statement_html_v15, build_statement_html_v16, build_statement_html_v17):
         assert build.landscape is False, build.__name__
 
 
@@ -415,7 +428,7 @@ def test_every_picker_option_has_a_builder() -> None:
     """A fourth option added to the picker without a builder would silently fall
     back to النموذج الأول — the exact bug the invoice dispatch test guards."""
     assert len(STATEMENT_TEMPLATE_OPTIONS) == len(_BUILDERS)
-    assert sorted(_BUILDERS) == list(range(1, 15))
+    assert sorted(_BUILDERS) == list(range(1, 18))
     for index, (_label, build) in enumerate(ALL_BUILDERS, start=1):
         assert _BUILDERS[index] is build
 
@@ -615,3 +628,74 @@ def test_v14_prints_both_parties_tax_identity() -> None:
 def test_v14_has_no_qr_code() -> None:
     html = build_statement_html_v14(_data())
     assert "QR" not in html and "qr" not in html.lower().replace("qrcode", "")
+
+
+# ======================================================================
+# النموذج الخامس عشر → السابع عشر (2026-10-20, fourth pick)
+# ======================================================================
+@pytest.mark.parametrize(
+    "build, expected",
+    [
+        (build_statement_html_v15, ["التاريخ", "البيان", "مدين", "دائن", "الرصيد"]),
+        (build_statement_html_v16, ["التاريخ", "هجري", "اليوم", "البيان", "مدين", "دائن", "الرصيد"]),
+        (build_statement_html_v17, ["التاريخ", "البيان", "مدين", "دائن", "الرصيد"]),
+    ],
+)
+def test_fourth_pick_columns(build, expected) -> None:
+    assert _ths(build(_data())) == expected
+
+
+def _with_customer() -> dict:
+    data = _data()
+    data["customer"] = {"customer_name": "شركة الريادة", "vat_number": "310000000000003",
+                        "cr": "1010101010", "address": "جدة - البلد"}
+    return data
+
+
+def test_v15_puts_the_address_in_the_window_and_marks_the_folds() -> None:
+    html = build_statement_html_v15(_with_customer())
+    window = html.split('<div class="win">')[1].split("</div></div>")[0]
+    assert "السادة / شركة الريادة" in window and "جدة - البلد" in window
+    assert html.count('class="fold"') == 2
+    assert "top:87mm" in html and "top:186mm" in html
+
+
+def test_v16_dates_every_movement_in_both_calendars() -> None:
+    html = build_statement_html_v16(_data())
+    # three movements + the two period ends
+    assert html.count("data-hijri=") == 5
+    assert 'data-hijri="2026-03-04"' in html
+    assert "islamic-umalqura" in html
+    assert "الأربعاء" in html            # 2026-03-04 is a Wednesday
+
+
+def test_v16_hijri_fallback_text_is_a_hijri_date() -> None:
+    html = build_statement_html_v16(_data())
+    # Qt's civil calendar under the span: 2026-03-04 falls in Ramadan 1447.
+    assert re.search(r'data-hijri="2026-03-04"[^>]*>1447/09/\d\d<', html)
+
+
+def test_settlement_days_are_fifo() -> None:
+    rows = [
+        _row("2026-01-01", "1", "100.00", "0.00", "فاتورة 1"),
+        _row("2026-01-05", "2", "50.00", "0.00", "فاتورة 2"),
+        _row("2026-01-11", "-", "0.00", "120.00", "سند 1"),
+        _row("2026-01-21", "-", "0.00", "10.00", "سند 2"),
+    ]
+    assert _settlement_days({"rows": rows}) == [10, None]   # invoice 2 still owes 30
+
+
+def test_v17_rates_payment_and_shows_days_per_invoice() -> None:
+    data = _with_customer()
+    html = build_statement_html_v17(data)
+    assert "1010101010" in html and "310000000000003" in html
+    # 65,550 is settled only partly by 20,000 → both invoices open.
+    assert html.count("مفتوحة") == 2
+    assert "لا توجد فواتير مسددة في الفترة" in html
+    assert ">ر<" in html                 # «شركة الريادة» → initial ر
+
+
+def test_v17_regular_payer() -> None:
+    rows = [_row("2026-01-01", "1", "100.00", "0.00", "فاتورة 1"),
+            _row("2026-01-11", "-", "0.00", "100.00", "سند 1")]
+    assert "منتظم في السداد · متوسط 10 يومًا" in build_statement_html_v17(_data(rows))

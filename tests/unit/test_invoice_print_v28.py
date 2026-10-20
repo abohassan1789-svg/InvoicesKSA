@@ -93,3 +93,20 @@ def test_company_seed_sql_matches_its_generator():
     for needle in ("شركة زيادة البركة التجارية", "311369317100003", "7009631370", "WHERE NOT EXISTS",
                    "stamp IS NULL", "image/png"):
         assert needle in sql
+
+
+def test_long_buyer_address_flows_and_pushes_the_table_down():
+    """A wrapping address must not overprint the VAT / CR lines (bug 2026-10-20)."""
+    short = build_invoice_html_v28(_data(3))
+    long_address = ("الرياض - حي العزيزية - شارع أبي القاسم الزهري - مبنى 7480 - "
+                    "الرقم الفرعي 3390 - الرمز البريدي 14513 - المملكة العربية السعودية")
+    customer = {**_data()["customer"], "address": long_address}
+    html = build_invoice_html_v28(_data(3, customer=customer))
+    # all buyer rows live in one flowing block, not one absolute div per row
+    block = html.split("<b>المشتري:</b>")[0].rsplit('<div style="position:absolute', 1)[1]
+    assert "top:343px" in block
+    assert "top:365px" not in html and "top:387px" not in html
+    # the short (source) buyer keeps the source geometry; the long one shifts the table down
+    assert "top:545px" in short
+    assert "top:545px" not in html
+    assert html.count("data-sheet") == 1

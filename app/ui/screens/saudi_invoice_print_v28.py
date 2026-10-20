@@ -40,7 +40,7 @@ import html
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from app.ui.screens.invoice_pagination import paginate, row_height, sheet_style
+from app.ui.screens.invoice_pagination import paginate, row_height, sheet_style, wrapped_lines
 from app.ui.screens.saudi_invoice_print import (
     QR_PRINT_PX,
     _ASSETS_DIR,
@@ -128,6 +128,18 @@ _FOOT_TOP = 1020
 
 _ROW_BUDGET = _ROWS_LIMIT - _TABLE_TOP - _HEAD_H
 
+# Seller / buyer blocks flow line under line (a long address wraps and pushes
+# the next line down instead of overlapping it, as in the source).
+_SELLER_TOP = 91
+_SELLER_W = 420
+_SELLER_FONT = 13.7
+_SELLER_LH = 21
+_BUYER_TOP = 343
+_BUYER_W = 560
+_BUYER_FONT = 15
+_BUYER_LH = 22
+_BUYER_ROOM = 4 * _BUYER_LH  # the source's four one-line rows; taller pushes the date + table down
+
 
 def _dec(value: Any) -> Decimal:
     try:
@@ -192,6 +204,21 @@ def _row_h(line: dict[str, Any], widths: dict[str, int]) -> float:
     return h
 
 
+def _flow_block(top: float, width: float, font_px: float, line_h: float,
+                lines: list[tuple[str, str]]) -> tuple[str, float]:
+    """Right-aligned stacked lines in normal flow; returns (html, estimated height).
+
+    ``lines`` holds (html, plain text) pairs — the plain text sizes the wrap.
+    """
+    body = "".join(f"<div>{markup}</div>" for markup, _plain in lines)
+    height = sum(wrapped_lines(plain, width, font_px) for _markup, plain in lines) * line_h
+    return (
+        f'<div style="position:absolute; right:{_RIGHT}px; top:{top}px; width:{width}px; '
+        f'text-align:right; font-size:{font_px}px; line-height:{line_h}px;" dir="rtl">{body}</div>',
+        height,
+    )
+
+
 def _abs(left: float, top: float, width: float, body: str, style: str = "") -> str:
     return (f'<div style="position:absolute; left:{left}px; top:{top}px; width:{width}px; '
             f'{style}">{body}</div>')
@@ -214,31 +241,35 @@ def build_invoice_html_v28(data: dict[str, Any]) -> str:
 
     # ---------------- header (repeats on every sheet) ----------------
     right = f"right:{_RIGHT}px; text-align:right;"
-    seller_lines = []
+    seller_lines: list[tuple[str, str]] = []
     if seller.get("address"):
-        seller_lines.append(_esc(_one_line(seller.get("address"))))
+        address = _one_line(seller.get("address"))
+        seller_lines.append((_esc(address), address))
     if seller.get("vat"):
-        seller_lines.append(f"الرقم الضريبي: {_ltr(_esc(seller.get('vat')))}")
+        vat = str(seller.get("vat"))
+        seller_lines.append((f"الرقم الضريبي: {_ltr(_esc(vat))}", f"الرقم الضريبي: {vat}"))
     if seller.get("cr"):
-        seller_lines.append(f"السجل التجاري: {_ltr(_esc(seller.get('cr')))}")
-    seller_html = "".join(
-        f'<div style="position:absolute; {right} top:{91 + 21 * i}px; width:420px; font-size:13.7px; '
-        f'line-height:20px;" dir="rtl">{text}</div>'
-        for i, text in enumerate(seller_lines)
-    )
+        cr = str(seller.get("cr"))
+        seller_lines.append((f"السجل التجاري: {_ltr(_esc(cr))}", f"السجل التجاري: {cr}"))
+    seller_html, _seller_h = _flow_block(_SELLER_TOP, _SELLER_W, _SELLER_FONT, _SELLER_LH, seller_lines)
 
-    buyer_lines = [f'<b>المشتري:</b> {_esc(customer.get("name"))}']
+    name = str(customer.get("name") or "")
+    buyer_lines: list[tuple[str, str]] = [(f"<b>المشتري:</b> {_esc(name)}", f"المشتري: {name}")]
     if customer.get("address"):
-        buyer_lines.append(_esc(_one_line(customer.get("address"))))
+        address = _one_line(customer.get("address"))
+        buyer_lines.append((_esc(address), address))
     if customer.get("vat"):
-        buyer_lines.append(f"الرقم الضريبي: {_ltr(_esc(customer.get('vat')))}")
+        vat = str(customer.get("vat"))
+        buyer_lines.append((f"الرقم الضريبي: {_ltr(_esc(vat))}", f"الرقم الضريبي: {vat}"))
     if customer.get("cr"):
-        buyer_lines.append(f"السجل التجاري / الموحد: {_ltr(_esc(customer.get('cr')))}")
-    buyer_html = "".join(
-        f'<div style="position:absolute; {right} top:{343 + 22 * i}px; width:560px; font-size:15px; '
-        f'line-height:22px;" dir="rtl">{text}</div>'
-        for i, text in enumerate(buyer_lines)
-    )
+        cr = str(customer.get("cr"))
+        buyer_lines.append((f"السجل التجاري / الموحد: {_ltr(_esc(cr))}", f"السجل التجاري / الموحد: {cr}"))
+    buyer_html, buyer_h = _flow_block(_BUYER_TOP, _BUYER_W, _BUYER_FONT, _BUYER_LH, buyer_lines)
+    # A buyer block taller than the source's four rows pushes the date row and
+    # the items table down by the overflow (and the page holds that much less).
+    shift = max(0, round(buyer_h - _BUYER_ROOM))
+    table_top = _TABLE_TOP + shift
+    row_budget = _ROW_BUDGET - shift
 
     qr_uri = qr_vector_data_uri(data.get("qr_payload"))
     qr_html = (
@@ -249,7 +280,7 @@ def build_invoice_html_v28(data: dict[str, Any]) -> str:
     rule_top = max(318, 112 + QR_PRINT_PX + 12)
 
     time_html = (
-        f'<div style="position:absolute; {right} top:490px; width:400px; font-size:13.7px; line-height:20px;" '
+        f'<div style="position:absolute; {right} top:{490 + shift}px; width:400px; font-size:13.7px; line-height:20px;" '
         f'dir="rtl">وقت الإصدار: {_ltr(_esc(time_text))} بتوقيت السعودية</div>'
         if time_text else ""
     )
@@ -263,10 +294,10 @@ def build_invoice_html_v28(data: dict[str, Any]) -> str:
   <div style="position:absolute; left:{_LEFT}px; top:{rule_top}px; width:{_CONTENT_W}px; height:0;
               border-top:1px solid {_RULE};"></div>
   {buyer_html}
-  <div style="position:absolute; {right} top:468px; width:400px; font-size:13.7px; line-height:20px;"
+  <div style="position:absolute; {right} top:{468 + shift}px; width:400px; font-size:13.7px; line-height:20px;"
        dir="rtl">تاريخ الإصدار: {_ltr(_esc(date_text))}</div>
   {time_html}
-  {_abs(_LEFT, 468, 300, _ltr(_esc(data.get("invoice_number"))), "font-size:13.7px; line-height:20px;")}
+  {_abs(_LEFT, 468 + shift, 300, _ltr(_esc(data.get("invoice_number"))), "font-size:13.7px; line-height:20px;")}
 """
 
     # ---------------- items ----------------
@@ -326,7 +357,7 @@ def build_invoice_html_v28(data: dict[str, Any]) -> str:
 
     pages = paginate(
         numbered, lambda ln: _row_h(ln, widths),
-        budget=_ROW_BUDGET, budget_last=_ROW_BUDGET - band_h,
+        budget=row_budget, budget_last=row_budget - band_h,
     )
     count = len(pages)
     sheets = []
@@ -338,7 +369,7 @@ def build_invoice_html_v28(data: dict[str, Any]) -> str:
         sheets.append(f"""
 <div data-sheet class="sheet" style="{sheet_style(last=last)}">
 {header_html}
-  <div style="position:absolute; left:0; top:{_TABLE_TOP}px; width:{_SHEET_W}px;">
+  <div style="position:absolute; left:0; top:{table_top}px; width:{_SHEET_W}px;">
     <table class="items" style="margin-left:{_LEFT}px;">
       <colgroup>{colgroup}</colgroup>
       <thead><tr>{head}</tr></thead>

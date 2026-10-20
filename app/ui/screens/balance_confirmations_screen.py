@@ -427,9 +427,15 @@ class BalanceConfirmationsScreen(BaseCrudScreen):
                 self, "طباعة مصادقة", "اختر مصادقة من القائمة أو أدخل بياناتها أولاً."
             )
             return
-        from app.ui.screens.balance_confirmation_print import BalanceConfirmationPreviewDialog
+        from app.ui.screens.balance_confirmation_print import (
+            BalanceConfirmationPreviewDialog,
+            choose_balance_confirmation_builder,
+        )
 
-        BalanceConfirmationPreviewDialog(data, parent=self).exec()
+        builder = choose_balance_confirmation_builder(self)
+        if builder is None:
+            return
+        BalanceConfirmationPreviewDialog(data, parent=self, html_builder=builder).exec()
 
     def _collect_print_data(self) -> dict[str, Any] | None:
         customer_id = self.customer_combo.currentData()
@@ -444,6 +450,9 @@ class BalanceConfirmationsScreen(BaseCrudScreen):
                 company = {}
             seller = {
                 "name": company.get("name_ar") or self.company_combo.currentText().strip(),
+                "cr": company.get("commercial_registration") or "",
+                "vat": company.get("vat_number") or "",
+                "address": company.get("address_ar") or "",
                 "logo": company.get("logo"),
                 "logo_mime": company.get("logo_mime"),
                 "stamp": company.get("stamp"),
@@ -456,6 +465,8 @@ class BalanceConfirmationsScreen(BaseCrudScreen):
             "date": self._date_text(),
             "customer": self.customer_combo.currentText().strip(),
             "balance": self._totals["balance"],
+            "total_debit": self._totals["total_debit"],
+            "total_credit": self._totals["total_credit"],
             "description": description_editor.text().strip() if description_editor is not None else "",
             "seller": seller,
         }

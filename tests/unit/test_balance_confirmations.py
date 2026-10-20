@@ -340,3 +340,88 @@ def test_letter_states_balance_direction_and_reply_slip(qt_app):
         "balance": Decimal("-40"), "seller": None,
     })
     assert "40.00" in credit and "لكم" in credit and "-40" not in credit
+
+
+# --------------------------------------------------------------------------- #
+# The four extra letter layouts (gallery picks 1, 2, 13, 14)
+# --------------------------------------------------------------------------- #
+_LOGO = b"\x89PNG-logo-bytes"
+_STAMP = b"\x89PNG-stamp-bytes"
+
+
+def _letter_data(**overrides):
+    data = {
+        "number": "BC-007", "date": "2026-10-20", "customer": "شركة النقيب للإنارة الحديثة",
+        "balance": Decimal("48750.00"), "total_debit": Decimal("186420.00"),
+        "total_credit": Decimal("137670.00"), "description": "ربع ثالث",
+        "seller": {"name": "شركة الأولى", "cr": "7009631370", "vat": "311369317100003",
+                   "address": "الرياض", "logo": _LOGO, "logo_mime": "image/png",
+                   "stamp": _STAMP, "stamp_mime": "image/png"},
+    }
+    data.update(overrides)
+    return data
+
+
+def test_picker_lists_the_original_then_the_four_picks(qt_app):
+    from app.ui.screens.balance_confirmation_print import (
+        BALANCE_CONFIRMATION_TEMPLATE_OPTIONS,
+        balance_confirmation_builders,
+        build_balance_confirmation_html,
+    )
+
+    assert BALANCE_CONFIRMATION_TEMPLATE_OPTIONS == (
+        "النموذج الأساسي", "الترويسة الكحلية", "الإطار المزدوج الرسمي",
+        "الأخضر المؤسسي", "المقارنة الجانبية",
+    )
+    builders = balance_confirmation_builders()
+    assert sorted(builders) == [1, 2, 3, 4, 5]
+    assert builders[1] is build_balance_confirmation_html
+    assert len(set(builders.values())) == 5
+
+
+@pytest.mark.parametrize("choice", [2, 3, 4, 5])
+def test_every_new_layout_prints_logo_stamp_and_letter(qt_app, choice):
+    import base64
+
+    from app.ui.screens.balance_confirmation_print import balance_confirmation_builders
+
+    page = balance_confirmation_builders()[choice](_letter_data())
+    assert base64.b64encode(_LOGO).decode() in page
+    assert base64.b64encode(_STAMP).decode() in page
+    assert "BC-007" in page and "شركة النقيب للإنارة الحديثة" in page
+    assert "48,750.00" in page and "عليكم" in page
+    assert 'data-hijri="2026-10-20"' in page
+    assert "15 يوم" in page and "التوقيع" in page
+    assert "السادة / شركة الأولى" in page
+
+
+@pytest.mark.parametrize("choice", [2, 3, 4, 5])
+def test_new_layouts_for_all_companies_print_without_logo(qt_app, choice):
+    from app.ui.screens.balance_confirmation_print import balance_confirmation_builders
+
+    page = balance_confirmation_builders()[choice](_letter_data(seller=None, balance=Decimal("-40")))
+    assert "data:image" not in page
+    assert "لكم" in page and "40.00" in page and "-40" not in page
+
+
+def test_print_uses_the_chosen_layout(screen, monkeypatch):
+    import app.ui.screens.balance_confirmation_print as bcp
+
+    chosen = []
+
+    class _Dialog:
+        def __init__(self, data, parent=None, html_builder=None):
+            chosen.append(html_builder)
+
+        def exec(self):
+            return 0
+
+    monkeypatch.setattr(bcp, "choose_balance_confirmation_builder", lambda parent: bcp.build_balance_confirmation_html)
+    monkeypatch.setattr(bcp, "BalanceConfirmationPreviewDialog", _Dialog)
+    screen._fill_form(screen.service.get_record(SPEC, 5))
+    screen.print_confirmation()
+    assert chosen == [bcp.build_balance_confirmation_html]
+
+    monkeypatch.setattr(bcp, "choose_balance_confirmation_builder", lambda parent: None)
+    screen.print_confirmation()       # cancelled picker: no dialog
+    assert len(chosen) == 1

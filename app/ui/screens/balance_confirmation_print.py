@@ -16,7 +16,7 @@ from __future__ import annotations
 import datetime
 import html
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Callable
 
 from PySide6.QtWidgets import QFileDialog, QMessageBox, QWidget
 
@@ -157,6 +157,50 @@ def build_balance_confirmation_html(data: dict[str, Any]) -> str:
 </html>"""
 
 
+# The picker shown by «طباعة مصادقة»: the original letter first, then the four
+# layouts picked from the 2026-10-20 gallery (its numbers 1, 2, 13 and 14).
+BALANCE_CONFIRMATION_TEMPLATE_OPTIONS: tuple[str, ...] = (
+    "النموذج الأساسي",
+    "الترويسة الكحلية",
+    "الإطار المزدوج الرسمي",
+    "الأخضر المؤسسي",
+    "المقارنة الجانبية",
+)
+
+
+def balance_confirmation_builders() -> dict[int, Callable[[dict[str, Any]], str]]:
+    """1-based picker choice → HTML builder, in the order of the options above."""
+    from app.ui.screens.balance_confirmation_print_templates import (
+        build_balance_confirmation_html_compare,
+        build_balance_confirmation_html_framed,
+        build_balance_confirmation_html_green,
+        build_balance_confirmation_html_navy,
+    )
+
+    return {
+        1: build_balance_confirmation_html,
+        2: build_balance_confirmation_html_navy,
+        3: build_balance_confirmation_html_framed,
+        4: build_balance_confirmation_html_green,
+        5: build_balance_confirmation_html_compare,
+    }
+
+
+def choose_balance_confirmation_builder(
+    parent: QWidget | None,
+) -> Callable[[dict[str, Any]], str] | None:
+    """Ask which letter layout to print; its builder, or ``None`` if cancelled."""
+    from app.ui.screens.saudi_invoice_print import choose_invoice_template
+
+    choice = choose_invoice_template(
+        parent, "طباعة مصادقة على الرصيد", BALANCE_CONFIRMATION_TEMPLATE_OPTIONS,
+        orientation="vertical",
+    )
+    if choice is None:
+        return None
+    return balance_confirmation_builders().get(choice, build_balance_confirmation_html)
+
+
 def _default_pdf_name(data: dict[str, Any]) -> str:
     number = str(data.get("number") or "").strip() or "confirmation"
     safe = "".join(ch for ch in number if ch.isalnum() or ch in ("-", "_")) or "confirmation"
@@ -166,8 +210,13 @@ def _default_pdf_name(data: dict[str, Any]) -> str:
 class BalanceConfirmationPreviewDialog(SaudiReceiptVoucherPreviewDialog):
     """The voucher preview window (PDF / print / close) showing the letter."""
 
-    def __init__(self, data: dict[str, Any], parent: QWidget | None = None) -> None:
-        super().__init__(data, parent=parent, html_builder=build_balance_confirmation_html)
+    def __init__(
+        self,
+        data: dict[str, Any],
+        parent: QWidget | None = None,
+        html_builder: Callable[[dict[str, Any]], str] = build_balance_confirmation_html,
+    ) -> None:
+        super().__init__(data, parent=parent, html_builder=html_builder)
         self.setWindowTitle("معاينة مصادقة على الرصيد")
 
     def _on_export(self) -> None:
@@ -194,7 +243,10 @@ class BalanceConfirmationPreviewDialog(SaudiReceiptVoucherPreviewDialog):
 
 
 __all__ = [
+    "BALANCE_CONFIRMATION_TEMPLATE_OPTIONS",
     "BalanceConfirmationPreviewDialog",
+    "balance_confirmation_builders",
+    "choose_balance_confirmation_builder",
     "balance_direction",
     "build_balance_confirmation_html",
 ]

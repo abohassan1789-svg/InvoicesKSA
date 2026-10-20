@@ -21,6 +21,10 @@ A new CRM screen (sidebar: **مصادقة على الرصيد**, after سندا�
 - Letter `balance_confirmation_print.py`: the user's sample letter (Gregorian +
   Hijri «حتى تاريخ», amount in words, 15-day note, tear-off reply), preview /
   PDF / print via the voucher preview dialog.
+- Print layouts (picker on «طباعة مصادقة», 2026-10-20): النموذج الأساسي plus the
+  user's gallery picks 1, 2, 13, 14 — «الترويسة الكحلية», «الإطار المزدوج الرسمي»,
+  «الأخضر المؤسسي», «المقارنة الجانبية» (`balance_confirmation_print_templates.py`),
+  all with the chosen company's logo and stamp (none for «كل الشركات»).
 - Permission target `crm.balance_confirmations.*`. Tests:
   `tests/unit/test_balance_confirmations.py`.
 

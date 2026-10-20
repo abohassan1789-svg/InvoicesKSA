@@ -2,6 +2,28 @@
 
 Last updated: 2026-09-19
 
+## «مصادقة على الرصيد» Balance Confirmations Screen (added 2026-10-20)
+
+A new CRM screen (sidebar: **مصادقة على الرصيد**, after سندات القبض), in the
+«الخطوات الثلاث» layout the user picked (mock-up 5 of 10):
+
+- Table `balance_confirmations` (id, confirmation_number BC-001… from
+  `balance_confirmation_number_seq`, confirmation_date, customer_id, nullable
+  company_id = «كل الشركات», total_debit / total_credit / balance snapshot,
+  description). Added to `schema/full_schema.sql` (auto-applied on startup) and
+  as migration `021_*` (+ downgrade).
+- `ReviewDataService.customer_balance(customer, company|None, as_of)` uses the
+  same movements as كشف حساب العميل (invoices − cash-invoice settlements −
+  receipt vouchers, up to the date). `save_record` always recomputes the
+  snapshot; the form never sends it.
+- Screen `balance_confirmations_screen.py` (BaseCrudScreen): 1 العميل والتاريخ /
+  2 مراجعة الرصيد (live, «عليكم»/«لكم») / 3 البيان والحفظ («حفظ وطباعة»), list below.
+- Letter `balance_confirmation_print.py`: the user's sample letter (Gregorian +
+  Hijri «حتى تاريخ», amount in words, 15-day note, tear-off reply), preview /
+  PDF / print via the voucher preview dialog.
+- Permission target `crm.balance_confirmations.*`. Tests:
+  `tests/unit/test_balance_confirmations.py`.
+
 ## «النموذج الثاني والعشرون» — «زيادة البركة» Replica (added 2026-10-20)
 
 A layout replica of the user's ``barakah-raqia-template-stamped.pdf`` (شركة زيادة

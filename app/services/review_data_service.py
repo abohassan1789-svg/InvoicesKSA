@@ -355,7 +355,7 @@ TABLE_SPECS: dict[str, TableSpec] = {
             FieldSpec("contract_day", "اليوم", readonly=True, virtual=True, group="البيانات الأساسية"),
             # Which company / customer pre-filled each party (the screen sets them).
             FieldSpec("first_party_company_id", "شركة الطرف الأول", "int", hidden_on_form=True),
-            FieldSpec("first_party_name", "الطرف الأول (السادة)", required=True, group="الطرف الأول"),
+            FieldSpec("first_party_name", "الطرف الأول", required=True, group="الطرف الأول"),
             FieldSpec("first_party_cr", "سجل تجاري رقم", group="الطرف الأول"),
             FieldSpec("first_party_cr_city", "مصدرها", group="الطرف الأول"),
             FieldSpec("first_party_address", "وعنوانها", group="الطرف الأول"),
@@ -364,7 +364,7 @@ TABLE_SPECS: dict[str, TableSpec] = {
             FieldSpec("first_party_rep_id", "سجل مدني", group="الطرف الأول"),
             FieldSpec("first_party_rep_title", "بصفته", group="الطرف الأول"),
             FieldSpec("second_party_customer_id", "عميل الطرف الثاني", "int", hidden_on_form=True),
-            FieldSpec("second_party_name", "الطرف الثاني (السادة)", required=True, group="الطرف الثاني"),
+            FieldSpec("second_party_name", "الطرف الثاني", required=True, group="الطرف الثاني"),
             FieldSpec("second_party_cr", "سجل تجاري رقم", group="الطرف الثاني"),
             FieldSpec("second_party_cr_city", "مصدره", group="الطرف الثاني"),
             FieldSpec("second_party_branches", "وفروعها في", group="الطرف الثاني"),
@@ -374,12 +374,15 @@ TABLE_SPECS: dict[str, TableSpec] = {
             FieldSpec("second_party_rep_title", "بصفته", group="الطرف الثاني"),
             FieldSpec("second_party_address", "وعنوانه", group="الطرف الثاني"),
             FieldSpec("supply_sites", "موقع التوريد", group="التوريد والسداد"),
-            FieldSpec("payment_days_after_first_supply", "السداد بعد (يوم) من أول توريد", "int",
+            # «… بعد ( n ) يوم من تاريخ أول توريد» / «خلال ( n ) أيام من … كشف الحساب».
+            FieldSpec("payment_days_after_first_supply", "أيام بعد أول توريد", "int",
                       group="التوريد والسداد"),
-            FieldSpec("payment_days_after_statement", "السداد خلال (أيام) من كشف الحساب", "int",
+            FieldSpec("payment_days_after_statement", "أيام بعد الكشف", "int",
                       group="التوريد والسداد"),
             FieldSpec("bank_name", "بنك", group="التوريد والسداد"),
             FieldSpec("bank_account", "رقم الحساب", group="التوريد والسداد"),
+            # «طباعة الختم»: a checkbox on the screen (not a text editor).
+            FieldSpec("show_stamp", "طباعة الختم", "bool", hidden_on_form=True),
         ),
     ),
 }
@@ -1276,6 +1279,10 @@ class ReviewDataService:
     def _coerce_value(self, field: FieldSpec, value: Any) -> Any:
         if value is None:
             return None
+        if field.data_type == "bool":
+            if isinstance(value, bool):
+                return value
+            return str(value).strip().lower() in {"1", "true", "yes", "on"}
         text = str(value).strip()
         if text == "":
             return None

@@ -285,7 +285,9 @@ class BaseCrudScreen(QWidget):
             scroll.setMaximumHeight(245)
         return scroll
 
-    def _build_field_group(self, title: str, fields: list[FieldSpec]) -> QGroupBox:
+    def _build_field_group(
+        self, title: str, fields: list[FieldSpec], columns: int | None = None
+    ) -> QGroupBox:
         box = QGroupBox(title)
         box.setStyleSheet(
             "QGroupBox { background:#FFFFFF; border:1px solid #E2E8F0; border-radius:7px; margin-top:14px; }"
@@ -297,7 +299,7 @@ class BaseCrudScreen(QWidget):
         grid.setHorizontalSpacing(12)
         grid.setVerticalSpacing(10)
         grid.setAlignment(Qt.AlignTop)
-        per_row = max(1, self.FORM_COLUMNS)
+        per_row = max(1, columns or self.FORM_COLUMNS)
         for index, field in enumerate(fields):
             label = QLabel(field.label)
             label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)

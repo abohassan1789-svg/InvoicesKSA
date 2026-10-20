@@ -17,14 +17,21 @@ layout they picked (mock-up 3 of 15):
   delete). In `schema/full_schema.sql` and migration `022_*` (+ downgrade).
 - Only the blanks are stored; every clause (التمهيد, أولاً … سابعاً) is fixed
   text in `supply_contract_print.py`.
-- Screen `supply_contracts_screen.py` (BaseCrudScreen): the four field groups
-  on the right; on the left a tab «معاينة العقد» (QTextBrowser, re-rendered on
-  every keystroke, filled blanks highlighted) and a tab «سجل العقود» (also F1).
-  The party names are editable dropdowns of الشركات / العملاء that pre-fill the
-  CR and address; any typed name is accepted. اليوم is derived from the date.
-- «طباعة العقد»: A4 preview / PDF / print, the text flowing over two pages with
-  16 mm margins, the first party's company stamp under its «الختم».
-- `BaseCrudScreen._collect_payload()` is the new hook for the save payload.
+- Screen `supply_contracts_screen.py` (BaseCrudScreen), no vertical scroll and
+  no on-screen preview (dropped at the user's request, same day): البيانات
+  الأساسية (+ «طباعة الختم» checkbox → `show_stamp`, migration `023_*`) beside
+  التوريد والسداد, then الطرف الأول beside الطرف الثاني, the list underneath
+  (also F1). The party names are editable dropdowns of الشركات / العملاء that
+  pre-fill the CR and address; any typed name is accepted. اليوم is derived
+  from the date.
+- «طباعة العقد» asks for a layout, then A4 preview / PDF / print (two pages,
+  16 mm margins, the first party's stamp under «الختم» when ticked). Layouts:
+  النموذج الأساسي (the user's original) plus gallery picks 2, 4, 9, 10, 11 —
+  «الترويسة الخضراء», «الكحلي والذهبي», «العنابي الرسمي», «الخضار والفواكه»,
+  «البطاقات» (`supply_contract_print_templates.py`, all built from
+  `contract_sections`, letterhead logo from the first party's company).
+- `BaseCrudScreen._collect_payload()` is the hook for the save payload;
+  `_build_field_group(..., columns=)` sets fields per row for one group.
 - Permission target `crm.supply_contracts.*`. Tests:
   `tests/unit/test_supply_contracts.py`.
 

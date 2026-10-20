@@ -1,13 +1,15 @@
 """Supply Contracts screen (عقود التوريد).
 
-The «النموذج مع معاينة العقد» layout the user picked from the 2026-10-20
-mock-ups (النموذج الثالث): the usual green header and CRUD toolbar, then
+The contract's blanks laid out to fit without a vertical scroll (the user
+dropped the side-by-side live preview on 2026-10-20): the usual green header
+and CRUD toolbar, then
 
-* on the right, the contract's blanks in four groups — البيانات الأساسية,
-  الطرف الأول, الطرف الثاني, التوريد والسداد;
-* on the left, the contract itself (``supply_contract_print``) re-rendered on
-  every keystroke, with each filled blank highlighted where it sits in the
-  fixed clauses; a second tab holds the list of saved contracts (also F1).
+* البيانات الأساسية (with «طباعة الختم») beside التوريد والسداد;
+* الطرف الأول beside الطرف الثاني;
+* the list of saved contracts underneath (also F1).
+
+The contract itself is seen in «طباعة العقد», which asks for one of the six
+print layouts and opens the preview / PDF / print window.
 
 The first party's name is a dropdown of «الشركات» and the second party's of
 «العملاء»: picking one pre-fills the commercial register and the address, but
@@ -20,33 +22,40 @@ from __future__ import annotations
 import datetime
 from typing import Any
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QKeySequence, QShortcut
 from PySide6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QCompleter,
     QDialog,
     QHBoxLayout,
+    QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QTabWidget,
-    QTextBrowser,
     QVBoxLayout,
     QWidget,
 )
 
 from app.services.review_data_service import ReviewDataService, TABLE_SPECS
-from app.ui.common.theme import GREEN, _button_style
+from app.ui.common.theme import GREEN, TEXT, _button_style
 from app.ui.dialogs.record_lookup_dialog import RecordLookupDialog
 from app.ui.screens.base_crud_screen import BaseCrudScreen
-from app.ui.screens.supply_contract_print import build_supply_contract_preview_html, contract_day_name
+from app.ui.screens.supply_contract_print import contract_day_name
 
 # Typed on a new contract; every one stays editable.
 NEW_CONTRACT_DEFAULTS = {
     "first_party_rep_title": "المدير العام",
     "second_party_rep_title": "المدير العام",
 }
+
+# Form rows, top to bottom: (group, fields per row, width share) side by side.
+FORM_ROWS: tuple[tuple[tuple[str, int, int], ...], ...] = (
+    (("البيانات الأساسية", 2, 2), ("التوريد والسداد", 3, 3)),
+    (("الطرف الأول", 2, 1), ("الطرف الثاني", 2, 1)),
+)
+
 
 class SupplyContractsScreen(BaseCrudScreen):
     SPEC_KEY = "supply_contracts"
@@ -57,7 +66,6 @@ class SupplyContractsScreen(BaseCrudScreen):
         super().__init__(service, TABLE_SPECS[self.SPEC_KEY], parent)
         self.lookup_shortcut = QShortcut(QKeySequence("F1"), self)
         self.lookup_shortcut.activated.connect(self.open_contract_lookup)
-        self._refresh_preview()
 
     # --- layout ----------------------------------------------------------------
     def _install_extra_toolbar_buttons(self, layout) -> None:
@@ -74,38 +82,44 @@ class SupplyContractsScreen(BaseCrudScreen):
         self.lookup_button.clicked.connect(self.open_contract_lookup)
 
     def _build_content(self):
-        content = QHBoxLayout()
-        content.setSpacing(10)
-        form = self._build_form_panel()
-        form.setMaximumHeight(16777215)  # the base caps non-lookup forms
-        content.addWidget(form, 1)
+        content = QVBoxLayout()
+        content.setSpacing(4)
+        # Kept for BaseCrudScreen (new_record / _fill_form write to it) but not
+        # laid out: رقم العقد already shows the current contract, and the row
+        # it would take is what keeps the form scroll-free.
+        self.summary_label = QLabel("سجل جديد")
 
-        self.side_tabs = QTabWidget()
-        self.side_tabs.setStyleSheet(
-            "QTabWidget::pane { border:1px solid #E2E8F0; border-radius:7px; background:#E5E7EB; top:-1px; }"
-            "QTabBar::tab { background:#E2E8F0; color:#64748B; border:1px solid #CBD5E1; border-bottom:none; "
-            "border-top-left-radius:7px; border-top-right-radius:7px; padding:8px 18px; font-weight:800; }"
-            f"QTabBar::tab:selected {{ background:#FFFFFF; color:{GREEN}; }}"
-        )
-        preview_page = QWidget()
-        preview_layout = QVBoxLayout(preview_page)
-        preview_layout.setContentsMargins(10, 10, 10, 10)
-        self.preview = QTextBrowser()
-        self.preview.setLayoutDirection(Qt.RightToLeft)
-        self.preview.setOpenLinks(False)
-        self.preview.setStyleSheet(
-            "QTextBrowser { background:#FFFFFF; border:1px solid #D1D5DB; padding:14px 16px; }"
-        )
-        preview_layout.addWidget(self.preview)
-        self.side_tabs.addTab(preview_page, "معاينة العقد")
-        self.side_tabs.addTab(self._build_list_panel(), "سجل العقود")
-        content.addWidget(self.side_tabs, 1)
-
-        self.preview_timer = QTimer(self)
-        self.preview_timer.setSingleShot(True)
-        self.preview_timer.setInterval(120)
-        self.preview_timer.timeout.connect(self._refresh_preview)
+        visible = [f for f in self.spec.fields if not f.hidden_on_form]
+        self.group_boxes = {}
+        for row in FORM_ROWS:
+            line = QHBoxLayout()
+            line.setSpacing(10)
+            for group, columns, share in row:
+                fields = [f for f in visible if f.group == group]
+                box = self._build_field_group(group, fields, columns)
+                grid = box.layout()
+                grid.setContentsMargins(14, 16, 14, 10)
+                grid.setVerticalSpacing(6)
+                self.group_boxes[group] = box
+                line.addWidget(box, share)
+            content.addLayout(line)
+        self._add_stamp_checkbox(self.group_boxes["البيانات الأساسية"])
+        content.addWidget(self._build_list_panel(), 1)
         return content
+
+    def _add_stamp_checkbox(self, box) -> None:
+        """«طباعة الختم» in the free cell after اليوم."""
+        self.stamp_checkbox = QCheckBox("طباعة الختم")
+        self.stamp_checkbox.setChecked(True)
+        self.stamp_checkbox.setToolTip("طباعة ختم شركة الطرف الأول تحت «الختم» في العقد")
+        self.stamp_checkbox.setStyleSheet(
+            f"QCheckBox {{ font-size:14px; font-weight:900; color:{TEXT}; spacing:8px; }}"
+            f"QCheckBox::indicator {{ width:18px; height:18px; }}"
+            f"QCheckBox::indicator:checked {{ background:{GREEN}; border:1px solid {GREEN}; border-radius:4px; }}"
+            "QCheckBox::indicator:unchecked { background:#FFFFFF; border:1px solid #94A3B8; border-radius:4px; }"
+        )
+        grid = box.layout()
+        grid.addWidget(self.stamp_checkbox, grid.rowCount() - 1, 2, 1, 2)
 
     # --- editors ---------------------------------------------------------------
     def _make_editor(self, field):
@@ -126,7 +140,6 @@ class SupplyContractsScreen(BaseCrudScreen):
         if isinstance(editor, QLineEdit):
             editor.setLayoutDirection(Qt.RightToLeft)
             editor.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
-            editor.textChanged.connect(self._schedule_preview)
             if field.name == "contract_date":
                 editor.textChanged.connect(self._update_day)
         return editor
@@ -141,7 +154,6 @@ class SupplyContractsScreen(BaseCrudScreen):
         if combo.completer() is not None:
             combo.completer().setCompletionMode(QCompleter.PopupCompletion)
             combo.completer().setFilterMode(Qt.MatchContains)
-        combo.editTextChanged.connect(self._schedule_preview)
         return combo
 
     def _fill_company_options(self, combo: QComboBox) -> None:
@@ -177,7 +189,6 @@ class SupplyContractsScreen(BaseCrudScreen):
                 editor.lineEdit().setCursorPosition(0)
             finally:
                 editor.blockSignals(False)
-            self._schedule_preview()
             return
         super()._set_editor_value(editor, value)
 
@@ -186,6 +197,7 @@ class SupplyContractsScreen(BaseCrudScreen):
         payload.pop("contract_day", None)
         payload["first_party_company_id"] = self._party_id(self.first_party_combo)
         payload["second_party_customer_id"] = self._party_id(self.second_party_combo)
+        payload["show_stamp"] = self.stamp_checkbox.isChecked()
         return payload
 
     # --- pre-fill from the company / customer ----------------------------------
@@ -227,12 +239,7 @@ class SupplyContractsScreen(BaseCrudScreen):
             if value not in (None, ""):
                 self._set_editor_value(self.inputs.get(name), value)
 
-    # --- live preview ----------------------------------------------------------
-    def _schedule_preview(self, *_args) -> None:
-        timer = getattr(self, "preview_timer", None)
-        if timer is not None:
-            timer.start()
-
+    # --- derived values -------------------------------------------------------
     def _update_day(self, *_args) -> None:
         day_editor = self.inputs.get("contract_day")
         date_editor = self.inputs.get("contract_date")
@@ -245,24 +252,22 @@ class SupplyContractsScreen(BaseCrudScreen):
         data.pop("contract_day", None)
         return {key: ("" if value is None else str(value).strip()) for key, value in data.items()}
 
-    def _refresh_preview(self) -> None:
-        if not hasattr(self, "preview"):
-            return
-        bar = self.preview.verticalScrollBar()
-        position = bar.value()
-        self.preview.setHtml(build_supply_contract_preview_html(self.contract_data()))
-        bar.setValue(position)
-
     # --- CRUD hooks ------------------------------------------------------------
     def _fill_form(self, record: dict[str, Any]) -> None:
         super()._fill_form(record)
         self._update_day()
+        self.stamp_checkbox.setChecked(record.get("show_stamp") is not False)
         self.summary_label.setText(f"العقد الحالي: {record.get('contract_number') or ''}")
-        self._refresh_preview()
 
     def _clear_form(self) -> None:
         super()._clear_form()
-        self._refresh_preview()
+        self.stamp_checkbox.setChecked(True)
+
+    def set_mode(self, mode: str) -> None:  # type: ignore[override]
+        super().set_mode(mode)
+        checkbox = getattr(self, "stamp_checkbox", None)
+        if checkbox is not None:
+            checkbox.setEnabled(mode in {"new", "edit"})
 
     def refresh_screen(self) -> None:  # type: ignore[override]
         for combo, refill in (
@@ -291,7 +296,6 @@ class SupplyContractsScreen(BaseCrudScreen):
             except Exception:
                 hint = "تلقائي (CT-...)"
             number_editor.setPlaceholderText(hint)
-        self.side_tabs.setCurrentIndex(0)
 
     def save_record(self) -> None:  # type: ignore[override]
         exclude_id = None if self.mode == "new" else self.current_id
@@ -334,9 +338,10 @@ class SupplyContractsScreen(BaseCrudScreen):
 
     # --- print -----------------------------------------------------------------
     def collect_print_data(self) -> dict[str, Any] | None:
-        data = self.contract_data()
+        data: dict[str, Any] = dict(self.contract_data())
         if not data.get("first_party_name") or not data.get("second_party_name"):
             return None
+        data["show_stamp"] = self.stamp_checkbox.isChecked()
         company_id = self._party_id(self.first_party_combo)
         if company_id is not None:
             try:
@@ -352,6 +357,12 @@ class SupplyContractsScreen(BaseCrudScreen):
                 self, "طباعة العقد", "اختر عقداً من السجل أو أدخل اسم الطرفين أولاً."
             )
             return
-        from app.ui.screens.supply_contract_print import SupplyContractPreviewDialog
+        from app.ui.screens.supply_contract_print import (
+            SupplyContractPreviewDialog,
+            choose_supply_contract_builder,
+        )
 
-        SupplyContractPreviewDialog(data, parent=self).exec()
+        builder = choose_supply_contract_builder(self)
+        if builder is None:
+            return
+        SupplyContractPreviewDialog(data, parent=self, html_builder=builder).exec()

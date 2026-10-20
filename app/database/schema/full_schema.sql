@@ -1666,6 +1666,7 @@ END $$;
 -- app/ui/screens/supply_contract_print.py. Each party's details are a snapshot
 -- typed on the screen; first_party_company_id / second_party_customer_id only
 -- remember which company / customer pre-filled them (SET NULL on delete).
+-- show_stamp = «طباعة الختم»: print the first party's stamp (migration 023).
 -- contract_number defaults to CT-0001, CT-0002, ... from its own sequence.
 --
 CREATE SEQUENCE IF NOT EXISTS public.supply_contract_number_seq
@@ -1703,6 +1704,7 @@ CREATE TABLE IF NOT EXISTS public.supply_contracts (
     payment_days_after_statement integer,
     bank_name character varying(255),
     bank_account character varying(64),
+    show_stamp boolean DEFAULT true NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     created_by integer,

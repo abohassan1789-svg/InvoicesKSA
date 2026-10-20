@@ -77,6 +77,7 @@ from app.ui.screens.saudi_invoice_print_v24 import build_invoice_html_v24
 from app.ui.screens.saudi_invoice_print_v25 import build_invoice_html_v25
 from app.ui.screens.saudi_invoice_print_v26 import build_invoice_html_v26
 from app.ui.screens.saudi_invoice_print_v27 import build_invoice_html_v27
+from app.ui.screens.saudi_invoice_print_v28 import build_invoice_html_v28
 
 # Warm-amber identity (النموذج السادس).
 _BROWN = "#7c2d12"
@@ -1693,6 +1694,12 @@ def build_phase1_invoice_timeline(data: dict[str, Any]) -> str:
     return build_invoice_html_v27({**data, "qr_payload": _phase1_qr_payload(data)})
 
 
+def build_phase1_invoice_barakah(data: dict[str, Any]) -> str:
+    """«النموذج الثاني والعشرون» — the «زيادة البركة» replica
+    (:func:`build_invoice_html_v28`) with the Phase-1 tags 1–5 QR."""
+    return build_invoice_html_v28({**data, "qr_payload": _phase1_qr_payload(data)})
+
+
 # ----------------------------------------------------------------------
 # Phase-2 native layouts (النموذج الأول → الثامن) reused inside «مرحلة أولى»
 # ----------------------------------------------------------------------
@@ -1796,6 +1803,9 @@ PHASE1_TEMPLATE_OPTIONS: tuple[str, ...] = (
     # «نهلة الخليج» (= «نموذج أطياف» سابقًا، v14) أُعيد إظهاره في المرحلتين بناءً على
     # طلب المستخدم (2026-10-20)؛ هنا بـ QR المرحلة الأولى (تاجات ١–٥).
     "نهلة الخليج",
+    # «زيادة البركة» (v28) — نسخة طبق الأصل من PDF المستخدم (طلب 2026-10-20)؛
+    # هنا بـ QR المرحلة الأولى (تاجات ١–٥).
+    "النموذج الثاني والعشرون",
 )
 
 # 1-based template index -> its HTML builder (None = reserved / not built yet).
@@ -1827,6 +1837,7 @@ _PHASE1_BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     19: build_phase1_invoice_mirror,   # v26 «المرآة ثنائية اللغة», Phase-1 QR
     20: build_phase1_invoice_timeline, # v27 «الخط الزمني», Phase-1 QR
     21: build_phase1_invoice_atyaf,    # v14 «نهلة الخليج», Phase-1 QR
+    22: build_phase1_invoice_barakah,  # v28 «زيادة البركة», Phase-1 QR
 }
 
 

@@ -2,6 +2,25 @@
 
 Last updated: 2026-09-19
 
+## «النموذج الثاني والعشرون» — «زيادة البركة» Replica (added 2026-10-20)
+
+A layout replica of the user's ``barakah-raqia-template-stamped.pdf`` (شركة زيادة
+البركة التجارية → مؤسسة الراقية للسبح والهدايا), added as **option 22 of both
+invoice pickers** under the name **«النموذج الثاني والعشرون»**:
+
+- Module `saudi_invoice_print_v28.py` (`build_invoice_html_v28`): seller, buyer,
+  items, totals and stamp all live from ``data``; fixed Letter sheets paginated
+  via `invoice_pagination` (header repeats, totals + stamp on the last page,
+  «n / i» counter in the footer). Arabic is Noto Naskh Arabic, embedded from the
+  bundled `noto_naskh_arabic_*.woff2` assets (SIL OFL), so no internet is needed.
+- Phase-2 (`_choose_invoice_builder`) → `build_invoice_html_v28` with the signed
+  tags 1–9 QR; «مرحلة أولى» → `build_phase1_invoice_barakah` (tags 1–5 QR).
+- Seller seed: `tools/barakah_company/barakah_company.sql` adds the company
+  (CR 7009631370, VAT 311369317100003) with the stamp lifted from the PDF;
+  idempotent.
+- Tests: `tests/unit/test_invoice_print_v28.py`, dispatch tests (22 options),
+  description-column test includes v28.
+
 ## «نهلة الخليج» Invoice Template Re-shown in Both Phases (added 2026-10-20)
 
 The «نهلة الخليج التجارية» replica (`saudi_invoice_print_v14.py`, formerly

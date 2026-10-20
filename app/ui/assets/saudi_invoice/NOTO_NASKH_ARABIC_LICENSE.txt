@@ -1,0 +1,7 @@
+noto_naskh_arabic_regular.woff2 / noto_naskh_arabic_bold.woff2
+
+Noto Naskh Arabic — Copyright 2022 The Noto Project Authors
+(https://github.com/notofonts/arabic). Licensed under the SIL Open Font
+License, Version 1.1 (https://openfontlicense.org). Converted from the
+Google Fonts TTF to WOFF2 without other changes; embedded by
+saudi_invoice_print_v28.py («النموذج الثاني والعشرون»).

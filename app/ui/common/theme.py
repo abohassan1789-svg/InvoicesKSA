@@ -71,6 +71,12 @@ RIGHT_ALIGNED_FIELDS = {
         "confirmation_number",
         "confirmation_date",
     },
+    "supply_contracts": {
+        "contract_number",
+        "contract_date",
+        "payment_days_after_first_supply",
+        "payment_days_after_statement",
+    },
     "units": {
         "unit_id",
         "unit_code",

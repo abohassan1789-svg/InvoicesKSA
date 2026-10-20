@@ -803,8 +803,12 @@ class BaseCrudScreen(QWidget):
             if record:
                 self._fill_form(record)
 
+    def _collect_payload(self) -> dict[str, Any]:
+        """The values sent to the service on save (one per form editor)."""
+        return {name: self._editor_value(editor) for name, editor in self.inputs.items()}
+
     def save_record(self) -> None:
-        payload = {name: self._editor_value(editor) for name, editor in self.inputs.items()}
+        payload = self._collect_payload()
         try:
             saved_id = self.service.save_record(
                 self.spec,

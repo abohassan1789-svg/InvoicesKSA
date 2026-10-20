@@ -49,6 +49,7 @@ from app.ui.screens.products_screen import ProductsScreen
 from app.ui.screens.units_screen import UnitsScreen
 from app.ui.screens.receipt_vouchers_screen import ReceiptVouchersScreen
 from app.ui.screens.balance_confirmations_screen import BalanceConfirmationsScreen
+from app.ui.screens.supply_contracts_screen import SupplyContractsScreen
 from app.ui.screens.cashier_page import CashierPage
 from app.ui.screens.roles_page import RolesPage
 from app.ui.screens.saudi_sales_invoice_page import SaudiSalesInvoicePage
@@ -64,6 +65,7 @@ MODULES = (
     ("companies", "الشركات", CompaniesScreen),
     ("receipt_vouchers", "سندات القبض", ReceiptVouchersScreen),
     ("balance_confirmations", "مصادقة على الرصيد", BalanceConfirmationsScreen),
+    ("supply_contracts", "عقود التوريد", SupplyContractsScreen),
     ("employees", "الموظفين", EmployeesScreen),
     ("daily_followups", "المتابعة اليومية", DailyFollowupsScreen),
     ("places", "المناطق", PlacesScreen),
@@ -90,6 +92,7 @@ NAV_ICONS: dict[str, str] = {
     "companies": "🏢",
     "receipt_vouchers": "💵",
     "balance_confirmations": "📝",
+    "supply_contracts": "📄",
 }
 
 # Reports: (report key, sidebar label, screen class).
@@ -211,7 +214,7 @@ class ReviewMainWindow(QMainWindow):
         self.setCentralWidget(central)
         self._highlight("dashboard")  # home dashboard is selected by default
 
-    PREWARM_ORDER = ("daily_followups", "customers", "products", "units", "companies", "receipt_vouchers", "balance_confirmations", "employees", "places", "case_statuses")
+    PREWARM_ORDER = ("daily_followups", "customers", "products", "units", "companies", "receipt_vouchers", "balance_confirmations", "supply_contracts", "employees", "places", "case_statuses")
 
     def prewarm_all(self, progress: Callable[[int, int, str], None] | None = None) -> None:
         """Pre-build the CRM data screens the user may view so they open fast."""

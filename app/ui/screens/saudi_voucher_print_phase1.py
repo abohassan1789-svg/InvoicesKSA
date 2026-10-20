@@ -55,6 +55,7 @@ from app.ui.screens.saudi_receipt_voucher_print import (
     build_receipt_voucher_html_v9,
     export_receipt_voucher_to_pdf,
 )
+from app.ui.screens.saudi_receipt_voucher_print_gallery import GALLERY_VOUCHER_TEMPLATES
 from app.ui.screens.saudi_receipt_voucher_print_v10 import build_receipt_voucher_html_v10
 from app.ui.screens.saudi_receipt_voucher_print_v11 import build_receipt_voucher_html_v11
 from app.ui.screens.saudi_receipt_voucher_print_v12 import build_receipt_voucher_html_v12
@@ -740,6 +741,9 @@ PHASE1_VOUCHER_TEMPLATE_OPTIONS: tuple[str, ...] = (
     "سند الامل",
     # «سند القصر» (2026-10-06) — the same builder the Phase-2 picker offers.
     "سند القصر",
+    # 13–20: the eight 2026-10-20 gallery picks — the same builders the Phase-2
+    # picker offers as 16–23.
+    *(label for label, _builder in GALLERY_VOUCHER_TEMPLATES),
 )
 
 # 1-based template index -> its HTML builder (None = reserved / not built yet).
@@ -756,6 +760,8 @@ _PHASE1_VOUCHER_BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     10: build_receipt_voucher_html_v10, # «سند عقيل» (as-is, shared with Phase-2)
     11: build_receipt_voucher_html_v11, # «سند الامل» (as-is, shared with Phase-2)
     12: build_receipt_voucher_html_v12, # «سند القصر» (as-is, shared with Phase-2)
+    # 13–20: the 2026-10-20 gallery picks (shared with Phase-2's 16–23).
+    **{13 + i: builder for i, (_label, builder) in enumerate(GALLERY_VOUCHER_TEMPLATES)},
 }
 
 

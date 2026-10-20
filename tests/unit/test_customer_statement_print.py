@@ -1,4 +1,4 @@
-"""The thirteen Customer Statement print templates (كشف حساب العميل).
+"""The fourteen Customer Statement print templates (كشف حساب العميل).
 
 Added 2026-07-16 with the templates themselves. These are string/logic checks over
 the built HTML, so they run headless; the printed geometry, the A4 orientations
@@ -29,6 +29,7 @@ from app.ui.screens.customer_statement_print import (
     build_statement_html_v11,
     build_statement_html_v12,
     build_statement_html_v13,
+    build_statement_html_v14,
     rows_with_balance,
 )
 
@@ -54,7 +55,11 @@ SECOND_BUILDERS = [
     ("النموذج الثاني عشر", build_statement_html_v12),
     ("النموذج الثالث عشر", build_statement_html_v13),
 ]
-ALL_BUILDERS = BUILDERS + NEW_BUILDERS + SECOND_BUILDERS
+# The third pick, 2026-10-20: the VAT statement mock-up, without its QR.
+THIRD_BUILDERS = [
+    ("النموذج الرابع عشر", build_statement_html_v14),
+]
+ALL_BUILDERS = BUILDERS + NEW_BUILDERS + SECOND_BUILDERS + THIRD_BUILDERS
 # Every template but النموذج التاسع, which carries the identity in its side
 # column instead of the three-column letterhead.
 LETTERHEAD_BUILDERS = [b for b in ALL_BUILDERS if b[1] is not build_statement_html_v9]
@@ -402,7 +407,7 @@ def test_orientation_is_declared_per_template() -> None:
     assert build_statement_html_v7.landscape is False
     assert build_statement_html_v8.landscape is False
     for build in (build_statement_html_v9, build_statement_html_v10, build_statement_html_v11,
-                  build_statement_html_v12, build_statement_html_v13):
+                  build_statement_html_v12, build_statement_html_v13, build_statement_html_v14):
         assert build.landscape is False, build.__name__
 
 
@@ -410,7 +415,7 @@ def test_every_picker_option_has_a_builder() -> None:
     """A fourth option added to the picker without a builder would silently fall
     back to النموذج الأول — the exact bug the invoice dispatch test guards."""
     assert len(STATEMENT_TEMPLATE_OPTIONS) == len(_BUILDERS)
-    assert sorted(_BUILDERS) == list(range(1, 14))
+    assert sorted(_BUILDERS) == list(range(1, 15))
     for index, (_label, build) in enumerate(ALL_BUILDERS, start=1):
         assert _BUILDERS[index] is build
 
@@ -566,3 +571,47 @@ def test_v13_words_drop_the_sign_of_a_credit_balance() -> None:
     from app.ui.screens.customer_statement_print import _words
 
     assert _words({"difference_label": "-1,250.00"}) == _words({"difference_label": "1,250.00"})
+
+
+# ======================================================================
+# النموذج الرابع عشر (2026-10-20, third pick)
+# ======================================================================
+def test_v14_columns() -> None:
+    assert _ths(build_statement_html_v14(_data())) == [
+        "التاريخ", "المستند", "قبل", "ضريبة", "الإجمالي", "المسدد", "الرصيد"]
+
+
+def test_v14_uses_the_stored_vat_split_when_given() -> None:
+    rows = [dict(ROWS[0], source_type="sales_invoice", source_id=7)]
+    data = _data(rows)
+    # A stored split that is NOT total/1.15, so only the stored one can print it.
+    data["vat_breakdown"] = {7: {"taxable": Decimal("60000.00"), "vat": Decimal("5550.00")}}
+    html = build_statement_html_v14(data)
+    assert "60,000.00" in html and "5,550.00" in html
+
+
+def test_v14_splits_at_fifteen_percent_without_a_stored_split() -> None:
+    html = build_statement_html_v14(_data())
+    # 65,550.00 = 57,000.00 + 8,550.00 ; 12,650.00 = 11,000.00 + 1,650.00
+    assert "57,000.00" in html and "8,550.00" in html
+    assert "68,000.00" in html and "10,200.00" in html   # the VAT summary totals
+
+
+def test_v14_receipts_carry_no_vat() -> None:
+    html = build_statement_html_v14(_data([ROWS[1]]))   # a receipt alone
+    assert re.search(r"عدد الفواتير الضريبية</td>.*?<span class=\"num\">0</span>", html, re.S)
+    assert re.search(r"ضريبة القيمة المضافة 15٪</td>.*?<span class=\"num\">0.00</span>", html, re.S)
+
+
+def test_v14_prints_both_parties_tax_identity() -> None:
+    data = _data()
+    data["customer"] = {"customer_name": "شركة الريادة", "vat_number": "310000000000003",
+                        "cr": "1010101010", "address": "جدة"}
+    html = build_statement_html_v14(data)
+    assert "المورّد" in html and "العميل" in html
+    assert "311474361800003" in html and "310000000000003" in html and "1010101010" in html
+
+
+def test_v14_has_no_qr_code() -> None:
+    html = build_statement_html_v14(_data())
+    assert "QR" not in html and "qr" not in html.lower().replace("qrcode", "")

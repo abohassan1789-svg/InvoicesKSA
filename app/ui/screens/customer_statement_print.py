@@ -1,4 +1,4 @@
-"""Printable Customer Statement (كشف حساب العميل) — thirteen templates.
+"""Printable Customer Statement (كشف حساب العميل) — fourteen templates.
 
 Approved in-conversation 2026-07-16. The screen offers the same template picker
 the sales-invoice screen uses, on معاينة / طباعة / تصدير PDF:
@@ -45,6 +45,13 @@ balance (الرصيد, from :func:`rows_with_balance`) — the user chose them w
   calendar per month, then the table with a weekday column. Portrait.
 * :func:`build_statement_html_v13` — «النموذج الثالث عشر», المالي المؤمّن: a
   guilloche border, logo watermark and the balance in Arabic words. Portrait.
+
+النموذج الرابع عشر was picked on 2026-10-20 from a third batch of ten, without the
+mock-up's QR code:
+
+* :func:`build_statement_html_v14` — «النموذج الرابع عشر», الكشف الضريبي المفصّل:
+  supplier and customer VAT identities, each invoice split into taxable amount,
+  15% VAT and total, a running balance and a VAT summary. Portrait.
 
 Why this module renders through ``QWebEngineView`` and not the shared
 ``PrintManager`` / ``PdfExporter`` the report used before
@@ -132,6 +139,7 @@ STATEMENT_TEMPLATE_OPTIONS: tuple[str, ...] = (
     "النموذج الحادي عشر",
     "النموذج الثاني عشر",
     "النموذج الثالث عشر",
+    "النموذج الرابع عشر",
 )
 
 _ZERO = Decimal("0.00")
@@ -1388,6 +1396,138 @@ build_statement_html_v13.landscape = False  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
+# النموذج الرابع عشر — الكشف الضريبي المفصّل (added 2026-10-20). Portrait
+# ---------------------------------------------------------------------------
+_VAT_RATE = Decimal("0.15")
+_CENT = Decimal("0.01")
+
+
+def _vat_split(row: dict[str, Any], breakdown: dict[Any, dict[str, Decimal]]) -> tuple[Decimal, Decimal] | None:
+    """(taxable, VAT) of an invoice debit row; ``None`` for a credit row.
+
+    The stored split from ``sales_invoices`` (``data["vat_breakdown"]``) when the
+    screen supplied it; otherwise the total is split at the standard 15% rate —
+    exact for a standard-rated invoice, since any discount is taken before VAT.
+    """
+    debit = _d(row.get("debit"))
+    if not debit:
+        return None
+    stored = breakdown.get(row.get("source_id")) if row.get("source_type") == "sales_invoice" else None
+    if stored:
+        return _d(stored.get("taxable")), _d(stored.get("vat"))
+    taxable = (debit / (1 + _VAT_RATE)).quantize(_CENT)
+    return taxable, debit - taxable
+
+
+def build_statement_html_v14(data: dict[str, Any]) -> str:
+    """A VAT statement: supplier and customer side by side with their VAT and CR
+    numbers, every invoice split into its taxable amount, its 15% VAT and its
+    total, the running balance, and a VAT summary. No QR (user 2026-10-20)."""
+    ink, copper, sand = "#2F3437", "#B5652B", "#F4F1EE"
+    s = _summary(data)
+    company = data.get("company") or {}
+    customer = data.get("customer") or {}
+    breakdown = data.get("vat_breakdown") or {}
+    css = _style(f"""
+      .vt td {{ padding:5px 4px; border-bottom:1px solid #E6E8E9; }}
+      .vt tbody tr:nth-child(even) td {{ background:#FAFAF9; }}
+      .vt .tot td {{ background:{sand} !important; font-weight:700; border-top:1.5px solid {ink}; border-bottom:1.5px solid {ink}; }}
+      .party {{ border:1px solid #DADDDF; border-radius:4px; font-size:10.5px; line-height:1.7; }}
+      .party .h {{ padding:4px 10px; background:{sand}; color:{copper}; font-weight:700; border-bottom:1px solid #DADDDF; }}
+      .party .b {{ padding:6px 10px; }}
+    """)
+
+    def party(title: str, name: str, vat: Any, cr: Any, address: Any) -> str:
+        lines = "".join(
+            f'<div>{lbl}: <span class="num">{_esc(v)}</span></div>' if lbl != "العنوان" else f"<div>{_esc(v)}</div>"
+            for lbl, v in (("الرقم الضريبي", vat), ("السجل التجاري", cr), ("العنوان", address)) if v
+        )
+        return (f'<div class="party"><div class="h">{title}</div><div class="b">'
+                f'<div style="font-size:12px; font-weight:700;">{name}</div>{lines}</div></div>')
+
+    parties = (
+        '<div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px;">'
+        + party("المورّد", _esc(company.get("name_ar") or data.get("company_label") or "الكل"),
+                company.get("vat_number"), company.get("commercial_registration"), company.get("address_ar"))
+        + party("العميل", _esc(customer.get("customer_name") or data.get("customer_label") or "الكل"),
+                customer.get("vat_number"), customer.get("cr"), customer.get("address"))
+        + "</div>"
+    )
+
+    taxable_total = vat_total = _ZERO
+    invoices = 0
+    body = []
+    for row, balance in rows_with_balance(_rows(data)):
+        split = _vat_split(row, breakdown)
+        if split:
+            taxable_total += split[0]
+            vat_total += split[1]
+            invoices += 1
+        body.append(
+            f'<tr><td style="text-align:center;">{_esc(row.get("transaction_date"))}</td>'
+            f'<td>{_esc(row.get("description"))}</td>'
+            f'<td style="text-align:center;">{_amt(split[0]) if split else _amt(0)}</td>'
+            f'<td style="text-align:center;">{_amt(split[1]) if split else _amt(0)}</td>'
+            f'<td style="text-align:center;">{_amt(row.get("debit"))}</td>'
+            f'<td style="text-align:center;">{_amt(row.get("credit"))}</td>'
+            f'<td style="text-align:center; font-weight:700;">{_bal(balance)}</td></tr>'
+        )
+    head = "".join(
+        f'<th style="padding:6px 4px; background:{ink}; color:#fff; font-weight:400; width:{w}; text-align:{al};">{t}</th>'
+        for t, w, al in (("التاريخ", "11%", "center"), ("المستند", "auto", "right"),
+                         ("قبل الضريبة", "13%", "center"), ("ضريبة 15٪", "11%", "center"),
+                         ("الإجمالي (مدين)", "13%", "center"), ("المسدد (دائن)", "13%", "center"),
+                         ("الرصيد", "14%", "center"))
+    )
+    foot = (
+        '<tr class="tot"><td></td><td>الإجمالي</td>'
+        f'<td style="text-align:center;" class="num">{_money(taxable_total)}</td>'
+        f'<td style="text-align:center;" class="num">{_money(vat_total)}</td>'
+        f'<td style="text-align:center;" class="num">{_esc(s.get("total_debit_label"))}</td>'
+        f'<td style="text-align:center;" class="num">{_esc(s.get("total_credit_label"))}</td>'
+        f'<td style="text-align:center;" class="num">{_esc(s.get("difference_label"))}</td></tr>'
+    )
+    table = (f'<table class="vt" style="font-size:10px;"><thead><tr>{head}</tr></thead>'
+             f'<tbody>{"".join(body)}{foot}</tbody></table>' if body else "")
+
+    def line(label: str, value: str, bold: bool = False) -> str:
+        weight = " font-weight:700;" if bold else ""
+        return (f'<tr><td style="border:1px solid #DADDDF; background:{sand}; padding:5px 10px; width:60%;">{label}</td>'
+                f'<td style="border:1px solid #DADDDF; padding:5px 10px; text-align:left;{weight}"><span class="num">{value}</span></td></tr>')
+
+    vat_box = (
+        '<div style="display:flex; justify-content:flex-end; margin-top:14px; page-break-inside:avoid;">'
+        '<table style="width:55%; font-size:10.5px;">'
+        + line("إجمالي المبيعات الخاضعة للضريبة", _money(taxable_total))
+        + line("ضريبة القيمة المضافة 15٪", _money(vat_total))
+        + line("الإجمالي شامل الضريبة", _money(taxable_total + vat_total), bold=True)
+        + line("عدد الفواتير الضريبية", str(invoices))
+        + line("الرصيد المستحق", _esc(s.get("difference_label")), bold=True)
+        + "</table></div>"
+    ) if body else ""
+
+    customer_id = data.get("customer_id")
+    to_month = str(data.get("date_to_label") or "").replace("-", "")[:6]
+    ref = f"ST-{customer_id}-{to_month}" if customer_id and to_month.isdigit() else "—"
+    title = (
+        f'<div style="display:flex; justify-content:space-between; align-items:flex-end; '
+        f'border-bottom:2px solid {copper}; padding-bottom:8px; margin-bottom:12px;">'
+        f'<div><div style="font-size:19px; font-weight:700; color:{ink};">{_esc(data.get("title"))}</div>'
+        f'<div style="font-size:10.5px; color:{copper};">كشف ضريبي مفصّل · <span dir="ltr">VAT Statement of Account</span></div></div>'
+        f'<div style="text-align:left; font-size:10.5px; color:#6E7477; line-height:1.7;">'
+        f'رقم الكشف <span class="num">{ref}</span><br>{_period(data)}</div></div>'
+    )
+    return _document(
+        css + _letterhead(data, accent=ink, rule=copper) + title + parties
+        + table + _empty_note(data) + vat_box + _auto_note(),
+        landscape=False,
+    )
+
+
+build_statement_html_v14.landscape = False  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
 # Dispatch + page layout
 # ---------------------------------------------------------------------------
 _BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
@@ -1404,6 +1544,7 @@ _BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     11: build_statement_html_v11,
     12: build_statement_html_v12,
     13: build_statement_html_v13,
+    14: build_statement_html_v14,
 }
 
 
@@ -1413,8 +1554,9 @@ def choose_statement_builder(
     """Ask which statement layout to use; return its builder or ``None``.
 
     Reuses the sales-invoice picker dialog rather than growing a second one — it
-    already takes its options as an argument. Thirteen options (2026-10-18) are
-    too many for its default single row, so they go in its two-column grid.
+    already takes its options as an argument. Thirteen options (2026-10-18), and
+    fourteen since 2026-10-20, are too many for its default single row, so they
+    go in its two-column grid.
     """
     choice = choose_invoice_template(
         parent, action_label, STATEMENT_TEMPLATE_OPTIONS, orientation="vertical"
@@ -1677,6 +1819,7 @@ __all__ = [
     "build_statement_html_v11",
     "build_statement_html_v12",
     "build_statement_html_v13",
+    "build_statement_html_v14",
     "choose_statement_builder",
     "statement_page_layout",
     "rows_with_balance",

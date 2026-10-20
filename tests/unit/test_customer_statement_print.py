@@ -33,6 +33,13 @@ from app.ui.screens.customer_statement_print import (
     build_statement_html_v15,
     build_statement_html_v16,
     build_statement_html_v17,
+    build_statement_html_v18,
+    build_statement_html_v19,
+    build_statement_html_v20,
+    build_statement_html_v21,
+    build_statement_html_v22,
+    build_statement_html_v23,
+    _move,
     _settlement_days,
     rows_with_balance,
 )
@@ -69,12 +76,24 @@ FOURTH_BUILDERS = [
     ("النموذج السادس عشر", build_statement_html_v16),
     ("النموذج السابع عشر", build_statement_html_v17),
 ]
-ALL_BUILDERS = BUILDERS + NEW_BUILDERS + SECOND_BUILDERS + THIRD_BUILDERS + FOURTH_BUILDERS
+# The fifth pick, same day: six looks of the one structure the user dictated.
+FIFTH_BUILDERS = [
+    ("النموذج الثامن عشر", build_statement_html_v18),
+    ("النموذج التاسع عشر", build_statement_html_v19),
+    ("النموذج العشرون", build_statement_html_v20),
+    ("النموذج الحادي والعشرون", build_statement_html_v21),
+    ("النموذج الثاني والعشرون", build_statement_html_v22),
+    ("النموذج الثالث والعشرون", build_statement_html_v23),
+]
+ALL_BUILDERS = (BUILDERS + NEW_BUILDERS + SECOND_BUILDERS + THIRD_BUILDERS + FOURTH_BUILDERS
+                + FIFTH_BUILDERS)
 # Every template but النموذج التاسع, which carries the identity in its side
-# column instead of the three-column letterhead, and النموذج الخامس عشر, whose
-# top is the sender block beside the envelope window.
+# column instead of the three-column letterhead, النموذج الخامس عشر, whose top
+# is the sender block beside the envelope window, and the fifth pick, whose
+# header (logo, company, then the title) the user dictated.
 LETTERHEAD_BUILDERS = [b for b in ALL_BUILDERS
-                       if b[1] not in (build_statement_html_v9, build_statement_html_v15)]
+                       if b[1] not in (build_statement_html_v9, build_statement_html_v15)
+                       and b not in FIFTH_BUILDERS]
 
 
 def _header_labels(html_text: str) -> list[str]:
@@ -299,7 +318,10 @@ def test_every_template_prints_the_movements_and_the_totals(label: str, builder)
     assert "20,000.00" in html, f"{label}: a movement is missing"
     assert "78,200.00" in html, f"{label}: the debit total is missing"
     assert "58,200.00" in html, f"{label}: the difference is missing"
-    assert "سند قبض رقم PA-014" in html, f"{label}: a description is missing"
+    if (label, builder) in FIFTH_BUILDERS:   # the number has its own column there
+        assert "سند قبض</td>" in html and "PA-014" in html, f"{label}: a movement is missing"
+    else:
+        assert "سند قبض رقم PA-014" in html, f"{label}: a description is missing"
 
 
 @pytest.mark.parametrize("label, builder", ALL_BUILDERS, ids=[b[0] for b in ALL_BUILDERS])
@@ -420,7 +442,8 @@ def test_orientation_is_declared_per_template() -> None:
     assert build_statement_html_v8.landscape is False
     for build in (build_statement_html_v9, build_statement_html_v10, build_statement_html_v11,
                   build_statement_html_v12, build_statement_html_v13, build_statement_html_v14,
-                  build_statement_html_v15, build_statement_html_v16, build_statement_html_v17):
+                  build_statement_html_v15, build_statement_html_v16, build_statement_html_v17,
+                  *(b for _, b in FIFTH_BUILDERS)):
         assert build.landscape is False, build.__name__
 
 
@@ -428,7 +451,7 @@ def test_every_picker_option_has_a_builder() -> None:
     """A fourth option added to the picker without a builder would silently fall
     back to النموذج الأول — the exact bug the invoice dispatch test guards."""
     assert len(STATEMENT_TEMPLATE_OPTIONS) == len(_BUILDERS)
-    assert sorted(_BUILDERS) == list(range(1, 18))
+    assert sorted(_BUILDERS) == list(range(1, 24))
     for index, (_label, build) in enumerate(ALL_BUILDERS, start=1):
         assert _BUILDERS[index] is build
 
@@ -699,3 +722,46 @@ def test_v17_regular_payer() -> None:
     rows = [_row("2026-01-01", "1", "100.00", "0.00", "فاتورة 1"),
             _row("2026-01-11", "-", "0.00", "100.00", "سند 1")]
     assert "منتظم في السداد · متوسط 10 يومًا" in build_statement_html_v17(_data(rows))
+
+
+# ======================================================================
+# النموذج الثامن عشر → الثالث والعشرون (2026-10-20, fifth pick)
+# ======================================================================
+@pytest.mark.parametrize("label, build", FIFTH_BUILDERS, ids=[b[0] for b in FIFTH_BUILDERS])
+def test_fifth_pick_columns(label, build) -> None:
+    assert _header_labels(build(_data())) == [
+        "م", "التاريخ", "رقم الحركة", "البيان", "مدين", "دائن", "الرصيد التراكمي"]
+
+
+@pytest.mark.parametrize("label, build", FIFTH_BUILDERS, ids=[b[0] for b in FIFTH_BUILDERS])
+def test_fifth_pick_keeps_the_dictated_order(label, build) -> None:
+    html = build(_with_customer())
+    marks = ['class="co"', "Bright Spark Company", 'class="cu"', "310000000000003",
+             'class="per"', "إجمالي الفواتير", "إجمالي المدفوعات", "الرصيد المتبقي",
+             "<thead>", "<tfoot>", "هذا الكشف صادر آلياً"]
+    positions = [html.index(m) for m in marks]
+    assert positions == sorted(positions), label
+    assert html.index("data:image/png;base64,") < html.index("شركة الشرارة المضيئة")
+
+
+@pytest.mark.parametrize("label, build", FIFTH_BUILDERS, ids=[b[0] for b in FIFTH_BUILDERS])
+def test_fifth_pick_totals_print_once(label, build) -> None:
+    html = build(_data())
+    # tfoot would repeat at every page break; the totals belong at the end only.
+    assert "tfoot { display:table-row-group; }" in html
+    foot = html.split("<tfoot>")[1]
+    assert "78,200.00" in foot and "20,000.00" in foot and "58,200.00" in foot
+    assert "عدد الفواتير: 2" in html and "عدد السندات: 1" in html
+
+
+def test_fifth_pick_numbers_rows_and_carries_the_balance() -> None:
+    html = build_statement_html_v18(_data())
+    rows = html.split("<tbody>")[1].split("</tbody>")[0].split("<tr>")[1:]
+    assert [r.split("</td>")[0] for r in rows] == ["<td>1", "<td>2", "<td>3"]
+    assert "45,550.00" in rows[1] and "58,200.00" in rows[2]
+
+
+def test_move_splits_the_number_off_the_description() -> None:
+    assert _move({"description": "فاتورة مبيعات آجلة رقم 985"}) == ("فاتورة مبيعات آجلة", "985")
+    assert _move({"description": "سند قبض رقم PA-014"}) == ("سند قبض", "PA-014")
+    assert _move({"description": "تسوية", "sales_invoice_number": "-"}) == ("تسوية", "—")

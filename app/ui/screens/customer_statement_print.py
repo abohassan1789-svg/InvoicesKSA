@@ -1,4 +1,4 @@
-"""Printable Customer Statement (كشف حساب العميل) — seventeen templates.
+"""Printable Customer Statement (كشف حساب العميل) — twenty-three templates.
 
 Approved in-conversation 2026-07-16. The screen offers the same template picker
 the sales-invoice screen uses, on معاينة / طباعة / تصدير PDF:
@@ -62,6 +62,13 @@ mock-up's QR code:
 * :func:`build_statement_html_v17` — «النموذج السابع عشر», ملف العميل: a customer
   profile with a payment rating and days-to-settle per invoice. Portrait.
 
+النموذج الثامن عشر → الثالث والعشرون were picked the same day from fifteen looks of
+one structure the user dictated — company and logo, customer, period, three cards
+(invoices / payments / balance), then م / التاريخ / رقم الحركة / البيان / مدين /
+دائن / الرصيد التراكمي and the totals — built by :func:`_fixed_statement`. All
+portrait: v18 الكحلي المؤسسي, v19 الفيروزي الحديث, v20 العنابي الرسمي, v21 البرتقالي
+الحيوي, v22 البنكي الكحلي والأحمر, v23 الأزرق المتدرج.
+
 Why this module renders through ``QWebEngineView`` and not the shared
 ``PrintManager`` / ``PdfExporter`` the report used before
 -----------------------------------------------------------------------
@@ -91,6 +98,7 @@ from __future__ import annotations
 
 import calendar
 import html
+import re
 from collections import OrderedDict
 from datetime import date
 from decimal import Decimal
@@ -152,6 +160,12 @@ STATEMENT_TEMPLATE_OPTIONS: tuple[str, ...] = (
     "النموذج الخامس عشر",
     "النموذج السادس عشر",
     "النموذج السابع عشر",
+    "النموذج الثامن عشر",
+    "النموذج التاسع عشر",
+    "النموذج العشرون",
+    "النموذج الحادي والعشرون",
+    "النموذج الثاني والعشرون",
+    "النموذج الثالث والعشرون",
 )
 
 _ZERO = Decimal("0.00")
@@ -1848,6 +1862,279 @@ build_statement_html_v17.landscape = False  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
+# النموذج الثامن عشر → الثالث والعشرون (added 2026-10-20) — one fixed structure
+# ---------------------------------------------------------------------------
+# The user dictated the order and picked six looks for it from fifteen mock-ups:
+# company + logo, customer, period, three cards (invoices / payments / balance),
+# then م / التاريخ / رقم الحركة / البيان / مدين / دائن / الرصيد التراكمي with the
+# totals under it. Only the CSS differs between the six.
+_MOVE_NO = re.compile(r"^(.*?)\s*رقم\s+(\S+)\s*$")
+
+_FIXED_CSS = """
+  .fx .co { display:flex; align-items:center; gap:16px; }
+  .fx .logo img { max-width:110px; max-height:64px; display:block; object-fit:contain; }
+  .fx .coinfo { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; font-size:10.5px; }
+  .fx .coname { font-size:17px; font-weight:700; }
+  .fx .doc { text-align:left; }
+  .fx .dt { font-size:20px; font-weight:700; }
+  .fx .dn { font-size:10.5px; margin-top:2px; }
+  .fx .cu { margin-top:14px; }
+  .fx .lbl { font-size:10.5px; font-weight:700; }
+  .fx .cugrid { display:grid; grid-template-columns:1.5fr 1fr 1fr; gap:4px 16px; margin-top:4px; }
+  .fx .cugrid .ad { grid-column:1/-1; }
+  .fx .cugrid i { font-style:normal; font-size:9.5px; display:block; }
+  .fx .cugrid b { font-size:12px; font-weight:600; overflow-wrap:anywhere; }
+  .fx .per { display:flex; gap:18px; align-items:center; margin-top:10px; font-size:11.5px; }
+  .fx .cards { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:12px; page-break-inside:avoid; }
+  .fx .card { padding:10px 14px; display:flex; align-items:center; gap:10px; }
+  .fx .cv { display:flex; flex-direction:column; gap:1px; flex:1; min-width:0; }
+  .fx .card i { font-style:normal; font-size:10.5px; }
+  .fx .card b { font-size:20px; font-weight:700; text-align:right; }
+  .fx .card small { font-size:9.5px; }
+  .fx table.tb { margin-top:14px; }
+  .fx .tb tfoot { display:table-row-group; }
+  .fx .tb th { font-size:10px; padding:6px 5px; text-align:center; font-weight:700; }
+  .fx .tb td { font-size:10.6px; padding:4.6px 5px; text-align:center; }
+  .fx .tb td.ds { text-align:right; }
+  .fx .tb td.a { text-align:left; }
+  .fx .tb tfoot td { font-weight:700; font-size:11.2px; padding:7px 5px; }
+"""
+
+
+def _move(row: dict[str, Any]) -> tuple[str, str]:
+    """(البيان, رقم الحركة): the service's «… رقم N» split in two."""
+    text = str(row.get("description") or "")
+    m = _MOVE_NO.match(text)
+    if m and m.group(1):
+        return m.group(1), m.group(2)
+    number = str(row.get("sales_invoice_number") or "").strip()
+    return text, number if number and number != "-" else "—"
+
+
+def _fixed_statement(data: dict[str, Any], theme: str, css: str) -> str:
+    s = _summary(data)
+    rows = _rows(data)
+    company = data.get("company") if isinstance(data.get("company"), dict) else None
+    customer = data.get("customer") or {}
+
+    head = ""
+    if company:
+        logo = company_logo_data_uri(company)
+        ids = " · ".join(f'{lbl} <span class="num">{_esc(v)}</span>' for lbl, v in (
+            ("السجل التجاري", company.get("commercial_registration")),
+            ("الرقم الضريبي", company.get("vat_number"))) if v)
+        head = (
+            (f'<div class="logo"><img src="{logo}" alt="logo"></div>' if logo else "")
+            + f'<div class="coinfo"><span class="coname">{_esc(company.get("name_ar"))}</span>'
+            + (f'<span dir="ltr" style="text-align:right;">{_esc(company.get("name_en"))}</span>' if company.get("name_en") else "")
+            + (f"<span>{ids}</span>" if ids else "")
+            + (f'<span>{_esc(company.get("address_ar"))}</span>' if company.get("address_ar") else "")
+            + "</div>"
+        )
+    else:
+        head = '<div class="coinfo"></div>'
+    head = (f'<div class="co">{head}<div class="doc"><div class="dt">{_esc(data.get("title"))}</div>'
+            f'<div class="dn">رقم الكشف <span class="num">{_statement_ref(data)}</span></div></div></div>')
+
+    fields = [("اسم العميل", _esc(customer.get("customer_name") or data.get("customer_label") or "الكل"), "")]
+    fields += [(lbl, f'<span class="num">{_esc(v)}</span>', "") for lbl, v in (
+        ("الرقم الضريبي", customer.get("vat_number")), ("السجل التجاري", customer.get("cr"))) if v]
+    if customer.get("address"):
+        fields.append(("العنوان", _esc(customer.get("address")), "ad"))
+    cust = ('<div class="cu"><div class="lbl">بيانات العميل</div><div class="cugrid">'
+            + "".join(f'<div class="{c}"><i>{lbl}</i><b>{v}</b></div>' for lbl, v, c in fields)
+            + "</div></div>")
+    period = (f'<div class="per"><span class="lbl">الفترة</span>'
+              f'<span>من <b>{_dt(data.get("date_from_label"))}</b></span>'
+              f'<span>إلى <b>{_dt(data.get("date_to_label"))}</b></span></div>')
+
+    invoices = sum(1 for r in rows if _d(r.get("debit")))
+    payments = sum(1 for r in rows if _d(r.get("credit")))
+    cards = '<div class="cards">' + "".join(
+        f'<div class="card {k}"><div class="cv"><i>{lbl}</i><b class="num">{_esc(v)}</b><small>{note}</small></div></div>'
+        for k, lbl, v, note in (
+            ("k1", "إجمالي الفواتير", s.get("total_debit_label"), f"عدد الفواتير: {invoices}"),
+            ("k2", "إجمالي المدفوعات", s.get("total_credit_label"), f"عدد السندات: {payments}"),
+            ("k3", "الرصيد المتبقي", s.get("difference_label"), "ريال سعودي"),
+        )) + "</div>"
+
+    body = []
+    for i, (r, balance) in enumerate(rows_with_balance(rows), start=1):
+        text, number = _move(r)
+        body.append(
+            f'<tr><td>{i}</td><td>{_dt(r.get("transaction_date"))}</td><td><span class="num">{_esc(number)}</span></td>'
+            f'<td class="ds">{_esc(text)}</td><td class="a">{_amt(r.get("debit"))}</td>'
+            f'<td class="a">{_amt(r.get("credit"))}</td><td class="a"><b>{_bal(balance)}</b></td></tr>')
+    cols = (("م", "5%"), ("التاريخ", "12%"), ("رقم الحركة", "10%"), ("البيان", "auto"),
+            ("مدين", "14%"), ("دائن", "14%"), ("الرصيد التراكمي", "17%"))
+    table = (
+        '<table class="tb"><thead><tr>' + "".join(f'<th style="width:{w};">{t}</th>' for t, w in cols)
+        + f'</tr></thead><tbody>{"".join(body)}</tbody><tfoot><tr>'
+        f'<td colspan="4" style="text-align:right;">الإجمالي</td>'
+        f'<td class="a"><span class="num">{_esc(s.get("total_debit_label"))}</span></td>'
+        f'<td class="a"><span class="num">{_esc(s.get("total_credit_label"))}</span></td>'
+        f'<td class="a"><span class="num">{_esc(s.get("difference_label"))}</span></td></tr></tfoot></table>'
+    ) if body else ""
+    return _document(
+        _style(_FIXED_CSS + css)
+        + f'<div class="fx {theme}">{head}{cust}{period}{cards}{table}{_empty_note(data)}{_auto_note()}</div>',
+        landscape=False,
+    )
+
+
+# النموذج الثامن عشر — الكحلي المؤسسي (mock-up 1): navy band, top-ruled cards.
+_T18 = """
+  .t18 { color:#1B2440; }
+  .t18 .co { background:#1F3A6E; color:#fff; padding:16px 18px; border-radius:4px; }
+  .t18 .coinfo span, .t18 .dn { color:#BFCBE6; }
+  .t18 .coinfo .coname { color:#fff; }
+  .t18 .logo { background:#fff; border-radius:4px; padding:4px; }
+  .t18 .cu { border-bottom:1px solid #DDE3EF; padding-bottom:10px; }
+  .t18 .lbl, .t18 .per b { color:#1F3A6E; }
+  .t18 .cugrid i, .t18 .card i, .t18 .card small { color:#7A86A3; }
+  .t18 .card { border:1px solid #DDE3EF; border-top:4px solid #1F3A6E; border-radius:4px; }
+  .t18 .card.k2 { border-top-color:#2E8B6E; } .t18 .card.k3 { border-top-color:#C0392B; }
+  .t18 .tb th { background:#1F3A6E; color:#fff; }
+  .t18 .tb tbody tr:nth-child(even) td { background:#F3F6FB; }
+  .t18 .tb tfoot td { background:#E6ECF7; border-top:2px solid #1F3A6E; }
+"""
+
+# النموذج التاسع عشر — الفيروزي الحديث (mock-up 5): rounded cards with a dot.
+_T19 = """
+  .t19 { color:#103A40; }
+  .t19 .coname, .t19 .dt, .t19 .lbl { color:#0E8C93; }
+  .t19 .coinfo span, .t19 .dn, .t19 .card i, .t19 .card small { color:#5D7E82; }
+  .t19 .coinfo .coname { color:#0E8C93; }
+  .t19 .doc { background:#E3F4F5; border-radius:14px; padding:10px 16px; }
+  .t19 .cu { border:1.5px solid #CFE7E9; border-radius:14px; padding:10px 16px; }
+  .t19 .cugrid i { color:#7C9A9E; }
+  .t19 .card { border-radius:14px; border:1.5px solid #CFE7E9; border-bottom-width:3px; }
+  .t19 .card::before { content:""; width:30px; height:30px; border-radius:50%; background:#E3F4F5; flex:none; }
+  .t19 .card.k1::before { background:#FCE9DC; } .t19 .card.k3::before { background:#0E8C93; }
+  .t19 .tb { border-collapse:separate; border-spacing:0; }
+  .t19 .tb th { background:#0E8C93; color:#fff; font-weight:400; }
+  .t19 .tb th:first-child { border-radius:0 10px 10px 0; } .t19 .tb th:last-child { border-radius:10px 0 0 10px; }
+  .t19 .tb td { border-bottom:1px solid #E6F1F2; }
+  .t19 .tb tfoot td { background:#E3F4F5; border-bottom:0; }
+  .t19 .tb tfoot td:first-child { border-radius:0 10px 10px 0; } .t19 .tb tfoot td:last-child { border-radius:10px 0 0 10px; }
+"""
+
+# النموذج العشرون — العنابي الرسمي (mock-up 6): titled boxes, full grid.
+_T20 = """
+  .t20 { color:#2B1A1D; font-family:"Traditional Arabic", "Simplified Arabic", Tahoma, serif; }
+  .t20 .co { border-bottom:4px double #7A1F2B; padding-bottom:10px; }
+  .t20 .coname, .t20 .dt { color:#7A1F2B; }
+  .t20 .coinfo span, .t20 .dn { color:#6F5A5D; }
+  .t20 .coinfo .coname { color:#7A1F2B; }
+  .t20 .cu, .t20 .per { border:1px solid #B88A90; padding:12px 14px 8px; position:relative; margin-top:18px; }
+  .t20 .cu .lbl, .t20 .per .lbl { position:absolute; top:-9px; right:12px; background:#fff; padding:0 8px; color:#7A1F2B; font-size:11px; }
+  .t20 .per { padding-top:10px; }
+  .t20 .cugrid i, .t20 .card i, .t20 .card small { color:#8E777A; }
+  .t20 .card { border:1px solid #B88A90; border-right:5px solid #7A1F2B; }
+  .t20 .tb th { border:1px solid #B88A90; background:#F6ECEE; color:#7A1F2B; }
+  .t20 .tb td { border:1px solid #E2CDD0; }
+  .t20 .tb tfoot td { background:#7A1F2B; color:#fff; border-color:#7A1F2B; }
+"""
+
+# النموذج الحادي والعشرون — البرتقالي الحيوي (mock-up 7): solid coloured cards.
+_T21 = """
+  .t21 { color:#22262B; }
+  .t21 .coname { font-weight:800; }
+  .t21 .coinfo span, .t21 .dn { color:#6B7178; }
+  .t21 .coinfo .coname { color:#22262B; }
+  .t21 .dt { color:#E8701A; font-weight:800; font-size:22px; }
+  .t21 .cu { border-right:4px solid #E8701A; padding-right:12px; }
+  .t21 .lbl { color:#E8701A; }
+  .t21 .cugrid i { color:#8A9097; }
+  .t21 .per b { background:#FFF1E6; padding:1px 8px; border-radius:4px; }
+  .t21 .card { border-radius:6px; color:#fff; background:#E8701A; }
+  .t21 .card.k2 { background:#2F3B47; } .t21 .card.k3 { background:#1F9D6B; }
+  .t21 .card i, .t21 .card small { color:rgba(255,255,255,.85); }
+  .t21 .tb th { background:#22262B; color:#fff; }
+  .t21 .tb td { border-bottom:1px solid #EEF0F2; }
+  .t21 .tb tbody tr td:first-child { border-right:3px solid #E8701A; }
+  .t21 .tb tfoot td { background:#FFF1E6; border-top:2px solid #E8701A; }
+"""
+
+# النموذج الثاني والعشرون — البنكي الكحلي والأحمر (mock-up 9): bank-statement grid.
+_T22 = """
+  .t22 { color:#14213D; }
+  .t22 .co { border-bottom:2px solid #14213D; padding-bottom:10px; }
+  .t22 .coname { font-weight:800; }
+  .t22 .coinfo span, .t22 .dn, .t22 .cugrid i, .t22 .card i, .t22 .card small { color:#5E6A82; }
+  .t22 .coinfo .coname { color:#14213D; }
+  .t22 .dt, .t22 .lbl, .t22 .card.k3 b { color:#C1121F; }
+  .t22 .dt { font-weight:800; }
+  .t22 .cugrid { border:1px solid #C9D0DC; border-left:0; border-bottom:0; gap:0; }
+  .t22 .cugrid > div { padding:5px 10px; border-left:1px solid #C9D0DC; border-bottom:1px solid #C9D0DC; }
+  .t22 .per { background:#14213D; color:#fff; padding:6px 12px; }
+  .t22 .per .lbl { color:#FFB4B9; }
+  .t22 .card { border:1px solid #C9D0DC; }
+  .t22 .card b { font-size:22px; }
+  .t22 .tb th { background:#14213D; color:#fff; border:1px solid #14213D; }
+  .t22 .tb td { border:1px solid #D8DDE6; }
+  .t22 .tb tfoot td { border:1px solid #14213D; background:#EDF0F5; }
+"""
+
+# النموذج الثالث والعشرون — الأزرق المتدرج (mock-up 12): gradient head, raised cards.
+_T23 = """
+  .t23 { color:#0F2A3D; }
+  .t23 .co { background:linear-gradient(120deg, #0B4F7C, #1A8FA6); color:#fff; padding:18px 20px 52px;
+             border-radius:6px 6px 50% 50% / 6px 6px 30px 30px; }
+  .t23 .logo { background:#fff; border-radius:6px; padding:4px; }
+  .t23 .coinfo span, .t23 .dn { color:#CFE8F0; }
+  .t23 .coinfo .coname { color:#fff; font-weight:800; }
+  .t23 .dt { font-weight:800; }
+  .t23 .cu { background:#fff; border-radius:12px; box-shadow:0 4px 14px rgba(11,79,124,.14); padding:10px 16px;
+             margin:-34px 14px 0; position:relative; }
+  .t23 .lbl { color:#0B4F7C; }
+  .t23 .cugrid i, .t23 .card i, .t23 .card small { color:#6C8798; }
+  .t23 .card { border-radius:12px; box-shadow:0 3px 10px rgba(11,79,124,.12); border:1px solid #E1EDF3; }
+  .t23 .card.k3 { background:linear-gradient(120deg, #0B4F7C, #1A8FA6); color:#fff; }
+  .t23 .card.k3 i, .t23 .card.k3 small { color:#CFE8F0; }
+  .t23 .tb th { color:#0B4F7C; border-bottom:2px solid #1A8FA6; }
+  .t23 .tb td { border-bottom:1px solid #E6F0F5; }
+  .t23 .tb tfoot td { background:#EAF5F8; color:#0B4F7C; }
+"""
+
+
+def build_statement_html_v18(data: dict[str, Any]) -> str:
+    """الكحلي المؤسسي: a navy band for the company, cards ruled on top."""
+    return _fixed_statement(data, "t18", _T18)
+
+
+def build_statement_html_v19(data: dict[str, Any]) -> str:
+    """الفيروزي الحديث: rounded boxes, a coloured dot per card, a pill header row."""
+    return _fixed_statement(data, "t19", _T19)
+
+
+def build_statement_html_v20(data: dict[str, Any]) -> str:
+    """العنابي الرسمي: each section in a titled frame, a fully ruled table."""
+    return _fixed_statement(data, "t20", _T20)
+
+
+def build_statement_html_v21(data: dict[str, Any]) -> str:
+    """البرتقالي الحيوي: solid orange / grey / green cards, an orange row edge."""
+    return _fixed_statement(data, "t21", _T21)
+
+
+def build_statement_html_v22(data: dict[str, Any]) -> str:
+    """البنكي الكحلي والأحمر: customer in ruled cells, a navy period bar, a bank grid."""
+    return _fixed_statement(data, "t22", _T22)
+
+
+def build_statement_html_v23(data: dict[str, Any]) -> str:
+    """الأزرق المتدرج: a curved gradient head with the customer box raised over it."""
+    return _fixed_statement(data, "t23", _T23)
+
+
+for _build in (build_statement_html_v18, build_statement_html_v19, build_statement_html_v20,
+               build_statement_html_v21, build_statement_html_v22, build_statement_html_v23):
+    _build.landscape = False  # type: ignore[attr-defined]
+del _build
+
+
+# ---------------------------------------------------------------------------
 # Dispatch + page layout
 # ---------------------------------------------------------------------------
 _BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
@@ -1868,6 +2155,12 @@ _BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     15: build_statement_html_v15,
     16: build_statement_html_v16,
     17: build_statement_html_v17,
+    18: build_statement_html_v18,
+    19: build_statement_html_v19,
+    20: build_statement_html_v20,
+    21: build_statement_html_v21,
+    22: build_statement_html_v22,
+    23: build_statement_html_v23,
 }
 
 
@@ -1878,8 +2171,8 @@ def choose_statement_builder(
 
     Reuses the sales-invoice picker dialog rather than growing a second one — it
     already takes its options as an argument. Thirteen options (2026-10-18), and
-    seventeen since 2026-10-20, are too many for its default single row, so they
-    go in its two-column grid.
+    twenty-three since 2026-10-20, are too many for its default single row, so
+    they go in its two-column grid.
     """
     choice = choose_invoice_template(
         parent, action_label, STATEMENT_TEMPLATE_OPTIONS, orientation="vertical"
@@ -2146,6 +2439,12 @@ __all__ = [
     "build_statement_html_v15",
     "build_statement_html_v16",
     "build_statement_html_v17",
+    "build_statement_html_v18",
+    "build_statement_html_v19",
+    "build_statement_html_v20",
+    "build_statement_html_v21",
+    "build_statement_html_v22",
+    "build_statement_html_v23",
     "choose_statement_builder",
     "statement_page_layout",
     "rows_with_balance",

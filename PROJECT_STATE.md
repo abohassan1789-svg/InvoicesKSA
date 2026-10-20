@@ -2,6 +2,32 @@
 
 Last updated: 2026-09-19
 
+## «عقود التوريد» Supply Contracts Screen (added 2026-10-20)
+
+A new CRM screen (sidebar: **عقود التوريد**, after مصادقة على الرصيد) for the
+user's two-page «عقد توريد خضار وفواكه», in the «النموذج مع معاينة العقد»
+layout they picked (mock-up 3 of 15):
+
+- Table `supply_contracts` (contract_number CT-0001… from
+  `supply_contract_number_seq`, contract_date, both parties: name, CR, CR city,
+  address / branches, representative name / nationality / ID / title, plus
+  supply_sites, payment_days_after_first_supply, payment_days_after_statement,
+  bank_name, bank_account). `first_party_company_id` / `second_party_customer_id`
+  only remember which company / customer pre-filled a party (SET NULL on
+  delete). In `schema/full_schema.sql` and migration `022_*` (+ downgrade).
+- Only the blanks are stored; every clause (التمهيد, أولاً … سابعاً) is fixed
+  text in `supply_contract_print.py`.
+- Screen `supply_contracts_screen.py` (BaseCrudScreen): the four field groups
+  on the right; on the left a tab «معاينة العقد» (QTextBrowser, re-rendered on
+  every keystroke, filled blanks highlighted) and a tab «سجل العقود» (also F1).
+  The party names are editable dropdowns of الشركات / العملاء that pre-fill the
+  CR and address; any typed name is accepted. اليوم is derived from the date.
+- «طباعة العقد»: A4 preview / PDF / print, the text flowing over two pages with
+  16 mm margins, the first party's company stamp under its «الختم».
+- `BaseCrudScreen._collect_payload()` is the new hook for the save payload.
+- Permission target `crm.supply_contracts.*`. Tests:
+  `tests/unit/test_supply_contracts.py`.
+
 ## «مصادقة على الرصيد» Balance Confirmations Screen (added 2026-10-20)
 
 A new CRM screen (sidebar: **مصادقة على الرصيد**, after سندات القبض), in the

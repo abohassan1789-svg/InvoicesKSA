@@ -335,6 +335,53 @@ TABLE_SPECS: dict[str, TableSpec] = {
             FieldSpec("company_name", "الشركة", virtual=True, hidden_on_form=True),
         ),
     ),
+    "supply_contracts": TableSpec(
+        key="supply_contracts",
+        table_name="supply_contracts",
+        title="عقود التوريد",
+        icon_text="ع",
+        primary_key="id",
+        search_columns=("contract_number", "first_party_name", "second_party_name", "contract_date"),
+        list_columns=("contract_number", "second_party_name", "first_party_name", "contract_date"),
+        lookup_columns=("id", "contract_number", "contract_date", "first_party_name", "second_party_name"),
+        # Only the blanks of «عقد توريد خضار وفواكه»; the clauses are fixed text
+        # in supply_contract_print. Each party's details are a typed snapshot.
+        fields=(
+            FieldSpec("id", "الكود", "int", readonly=True, hidden_on_form=True),
+            # Empty = automatic CT-<n> from the sequence (the DB DEFAULT).
+            FieldSpec("contract_number", "رقم العقد", group="البيانات الأساسية"),
+            FieldSpec("contract_date", "تاريخ العقد", "date", required=True, group="البيانات الأساسية"),
+            # Shown only: the weekday of contract_date («أنه في يوم ...»).
+            FieldSpec("contract_day", "اليوم", readonly=True, virtual=True, group="البيانات الأساسية"),
+            # Which company / customer pre-filled each party (the screen sets them).
+            FieldSpec("first_party_company_id", "شركة الطرف الأول", "int", hidden_on_form=True),
+            FieldSpec("first_party_name", "الطرف الأول (السادة)", required=True, group="الطرف الأول"),
+            FieldSpec("first_party_cr", "سجل تجاري رقم", group="الطرف الأول"),
+            FieldSpec("first_party_cr_city", "مصدرها", group="الطرف الأول"),
+            FieldSpec("first_party_address", "وعنوانها", group="الطرف الأول"),
+            FieldSpec("first_party_rep_name", "ويمثلها السيد", group="الطرف الأول"),
+            FieldSpec("first_party_rep_nationality", "الجنسية", group="الطرف الأول"),
+            FieldSpec("first_party_rep_id", "سجل مدني", group="الطرف الأول"),
+            FieldSpec("first_party_rep_title", "بصفته", group="الطرف الأول"),
+            FieldSpec("second_party_customer_id", "عميل الطرف الثاني", "int", hidden_on_form=True),
+            FieldSpec("second_party_name", "الطرف الثاني (السادة)", required=True, group="الطرف الثاني"),
+            FieldSpec("second_party_cr", "سجل تجاري رقم", group="الطرف الثاني"),
+            FieldSpec("second_party_cr_city", "مصدره", group="الطرف الثاني"),
+            FieldSpec("second_party_branches", "وفروعها في", group="الطرف الثاني"),
+            FieldSpec("second_party_rep_name", "ويمثلها السيد", group="الطرف الثاني"),
+            FieldSpec("second_party_rep_nationality", "الجنسية", group="الطرف الثاني"),
+            FieldSpec("second_party_rep_id", "هوية رقم", group="الطرف الثاني"),
+            FieldSpec("second_party_rep_title", "بصفته", group="الطرف الثاني"),
+            FieldSpec("second_party_address", "وعنوانه", group="الطرف الثاني"),
+            FieldSpec("supply_sites", "موقع التوريد", group="التوريد والسداد"),
+            FieldSpec("payment_days_after_first_supply", "السداد بعد (يوم) من أول توريد", "int",
+                      group="التوريد والسداد"),
+            FieldSpec("payment_days_after_statement", "السداد خلال (أيام) من كشف الحساب", "int",
+                      group="التوريد والسداد"),
+            FieldSpec("bank_name", "بنك", group="التوريد والسداد"),
+            FieldSpec("bank_account", "رقم الحساب", group="التوريد والسداد"),
+        ),
+    ),
 }
 
 # Label of the «all companies» choice on screens whose company is optional.
@@ -671,6 +718,29 @@ class ReviewDataService:
             conn.execute(
                 "SELECT setval('balance_confirmation_number_seq', %(n)s, true) "
                 "FROM balance_confirmation_number_seq "
+                "WHERE (CASE WHEN is_called THEN last_value ELSE last_value - 1 END) < %(n)s",
+                {"n": int(text[3:])},
+            )
+
+    def peek_next_supply_contract_number(self) -> str:
+        """The CT-<n> the sequence will hand out next (hint only, never stored)."""
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT last_value, is_called FROM supply_contract_number_seq"
+            ).fetchone()
+        value = int(row["last_value"]) + (1 if row["is_called"] else 0)
+        return f"CT-{value:04d}"
+
+    def register_manual_supply_contract_number(self, number: Any) -> None:
+        """Move the sequence past a manual «CT-<n>» so automatic numbers never
+        collide with it. Forward-only: a smaller manual number changes nothing."""
+        text = "" if number is None else str(number).strip()
+        if not text.upper().startswith("CT-") or not text[3:].isdigit():
+            return
+        with self.connect() as conn:
+            conn.execute(
+                "SELECT setval('supply_contract_number_seq', %(n)s, true) "
+                "FROM supply_contract_number_seq "
                 "WHERE (CASE WHEN is_called THEN last_value ELSE last_value - 1 END) < %(n)s",
                 {"n": int(text[3:])},
             )
@@ -1032,6 +1102,10 @@ class ReviewDataService:
                     clean_payload.get("confirmation_date"),
                 )
             )
+
+        if spec.key == "supply_contracts" and clean_payload.get("contract_number") is None:
+            # Empty number = automatic CT-<n> (same rule as receipt vouchers).
+            clean_payload.pop("contract_number", None)
 
         if spec.key == "products" and clean_payload.get("item_code") is None:
             # كود الصنف is now user-editable. A blank code means "automatic": drop

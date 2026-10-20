@@ -1782,7 +1782,8 @@ PHASE1_TEMPLATE_OPTIONS: tuple[str, ...] = (
     # «الامل الناجح»/«قصر نصار»/«نوافذ» أُخفيت من المُنتقي بناءً على طلب المستخدم
     # (2026-10-17)؛ دوالها (build_phase1_invoice_mawsim/drob/gharbia/modi/mig/amal/
     # qasr/nawafidh) ما زالت معرّفة أعلاه ويمكن إعادة إدراجها لاحقًا.
-    # «نموذج أطياف» (build_phase1_invoice_atyaf) أُخفي كذلك (طلب 2026-10-17).
+    # «نموذج أطياف» (build_phase1_invoice_atyaf) أُخفي كذلك (طلب 2026-10-17)، ثم
+    # أُعيد في آخر القائمة باسم «نهلة الخليج» (طلب 2026-10-20).
     # ثلاثة تصاميم جديدة اختارها المستخدم من معرض الموك أب (2026-10-18) — نفس
     # نماذج المرحلة الثانية ١٥–١٧ بالضبط، الفرق الوحيد QR المرحلة الأولى.
     "النموذج الخامس عشر",   # «البطاقات»
@@ -1792,6 +1793,9 @@ PHASE1_TEMPLATE_OPTIONS: tuple[str, ...] = (
     "النموذج الثامن عشر",   # «بطاقة الصعود»
     "النموذج التاسع عشر",   # «المرآة ثنائية اللغة»
     "النموذج العشرون",      # «الخط الزمني»
+    # «نهلة الخليج» (= «نموذج أطياف» سابقًا، v14) أُعيد إظهاره في المرحلتين بناءً على
+    # طلب المستخدم (2026-10-20)؛ هنا بـ QR المرحلة الأولى (تاجات ١–٥).
+    "نهلة الخليج",
 )
 
 # 1-based template index -> its HTML builder (None = reserved / not built yet).
@@ -1822,6 +1826,7 @@ _PHASE1_BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     18: build_phase1_invoice_boarding, # v25 «بطاقة الصعود», Phase-1 QR
     19: build_phase1_invoice_mirror,   # v26 «المرآة ثنائية اللغة», Phase-1 QR
     20: build_phase1_invoice_timeline, # v27 «الخط الزمني», Phase-1 QR
+    21: build_phase1_invoice_atyaf,    # v14 «نهلة الخليج», Phase-1 QR
 }
 
 

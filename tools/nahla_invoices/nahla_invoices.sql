@@ -4,6 +4,10 @@
 -- without changing anything if any of these invoice numbers already
 -- exists for this seller.
 
+-- The file is UTF-8; say so explicitly so psql on Windows (console code
+-- page, e.g. WIN1256) does not mangle the Arabic text.
+SET client_encoding = 'UTF8';
+
 BEGIN;
 
 -- Seller (matched by VAT number; inserted only if missing).

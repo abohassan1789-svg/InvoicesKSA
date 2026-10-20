@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any
 
 import psycopg
@@ -304,7 +305,40 @@ TABLE_SPECS: dict[str, TableSpec] = {
             FieldSpec("customer_name", "اسم العميل", virtual=True, hidden_on_form=True),
         ),
     ),
+    "balance_confirmations": TableSpec(
+        key="balance_confirmations",
+        table_name="balance_confirmations",
+        title="مصادقة على الرصيد",
+        icon_text="م",
+        primary_key="id",
+        # Searchable by number, customer name, company name (JOINs in
+        # _list_balance_confirmations) or date — partial (ILIKE) match.
+        search_columns=("confirmation_number", "customer_name", "company_name", "confirmation_date"),
+        list_columns=("confirmation_number", "customer_name", "company_name", "confirmation_date", "balance"),
+        lookup_columns=("id", "confirmation_number", "confirmation_date", "customer_name", "company_name", "balance"),
+        fields=(
+            FieldSpec("id", "الكود", "int", readonly=True, hidden_on_form=True),
+            # Empty = automatic BC-<n> from the sequence (the DB DEFAULT).
+            FieldSpec("confirmation_number", "رقم الحركة"),
+            FieldSpec("confirmation_date", "التاريخ", "date", required=True),
+            FieldSpec("customer_id", "اسم العميل", "int", required=True),
+            # NULL = «كل الشركات»: the balance spans every company.
+            FieldSpec("company_id", "الشركة", "int"),
+            # The balance and the totals behind it are never typed: save_record
+            # recomputes them from the statement as of confirmation_date.
+            FieldSpec("total_debit", "إجمالي الفواتير", "float", readonly=True),
+            FieldSpec("total_credit", "إجمالي المقبوضات", "float", readonly=True),
+            FieldSpec("balance", "الرصيد المتبقي", "float", readonly=True),
+            FieldSpec("description", "البيان"),
+            # Grid-only columns from the customers / companies JOINs.
+            FieldSpec("customer_name", "اسم العميل", virtual=True, hidden_on_form=True),
+            FieldSpec("company_name", "الشركة", virtual=True, hidden_on_form=True),
+        ),
+    ),
 }
+
+# Label of the «all companies» choice on screens whose company is optional.
+ALL_COMPANIES_LABEL = "كل الشركات"
 
 
 class ReviewDataService:
@@ -362,6 +396,8 @@ class ReviewDataService:
             return self._list_daily_followups(columns, keyword, limit)
         if spec.key == "receipt_vouchers":
             return self._list_receipt_vouchers(columns, keyword, limit)
+        if spec.key == "balance_confirmations":
+            return self._list_balance_confirmations(columns, keyword, limit)
         columns = list(dict.fromkeys([spec.primary_key, *[c for c in columns if c != spec.primary_key]]))
         query = SQL("SELECT {cols} FROM {table}").format(
             cols=SQL(", ").join(Identifier(c) for c in columns),
@@ -520,6 +556,124 @@ class ReviewDataService:
         params.append(limit)
         with self.connect() as conn:
             return list(conn.execute(query, params))
+
+    # Same pattern for the balance-confirmations screen: customer and company
+    # names come from JOINs; a NULL company reads «كل الشركات».
+    _BALANCE_CONFIRMATION_SELECT = (
+        ("id", "bc.id"),
+        ("confirmation_number", "bc.confirmation_number"),
+        ("confirmation_date", "bc.confirmation_date"),
+        ("customer_id", "bc.customer_id"),
+        ("customer_name", "c.customer_name"),
+        ("company_id", "bc.company_id"),
+        ("company_name", f"COALESCE(co.name_ar, '{ALL_COMPANIES_LABEL}')"),
+        ("total_debit", "bc.total_debit"),
+        ("total_credit", "bc.total_credit"),
+        ("balance", "bc.balance"),
+        ("description", "bc.description"),
+    )
+
+    _BALANCE_CONFIRMATION_SEARCH = (
+        ("confirmation_number", "bc.confirmation_number"),
+        ("customer_name", "c.customer_name"),
+        ("company_name", f"COALESCE(co.name_ar, '{ALL_COMPANIES_LABEL}')"),
+        ("confirmation_date", "bc.confirmation_date"),
+    )
+
+    def _list_balance_confirmations(
+        self,
+        columns: list[str] | tuple[str, ...],
+        keyword: str,
+        limit: int,
+    ) -> list[dict[str, Any]]:
+        select_map = dict(self._BALANCE_CONFIRMATION_SELECT)
+        requested = list(dict.fromkeys(columns))
+        selected = [(alias, select_map[alias]) for alias in requested if alias in select_map]
+        if not selected:
+            selected = [("id", select_map["id"])]
+        select_list = SQL(", ").join(
+            SQL("{expr} AS {alias}").format(expr=SQL(expr), alias=Identifier(alias))
+            for alias, expr in selected
+        )
+        query = (
+            SQL("SELECT ")
+            + select_list
+            + SQL(
+                " FROM balance_confirmations bc "
+                "LEFT JOIN customers c ON c.customer_id = bc.customer_id "
+                "LEFT JOIN companies co ON co.id = bc.company_id"
+            )
+        )
+        params: list[Any] = []
+        if keyword.strip():
+            like = f"%{keyword.strip()}%"
+            conditions = SQL(" OR ").join(
+                SQL("CAST({expr} AS text) ILIKE %s").format(expr=SQL(expr))
+                for _alias, expr in self._BALANCE_CONFIRMATION_SEARCH
+            )
+            query += SQL(" WHERE ") + conditions
+            params.extend([like] * len(self._BALANCE_CONFIRMATION_SEARCH))
+        query += SQL(" ORDER BY bc.id ASC LIMIT %s")
+        params.append(limit)
+        with self.connect() as conn:
+            return list(conn.execute(query, params))
+
+    def customer_balance(
+        self, customer_id: Any, company_id: Any | None, as_of: Any
+    ) -> dict[str, Decimal]:
+        """A customer's statement balance as of ``as_of`` (inclusive).
+
+        Same movements as كشف حساب العميل (``CustomerStatementReportRepository``):
+        every sales invoice is a debit; a cash invoice's own settlement and every
+        receipt voucher are credits. ``company_id`` None sums every company.
+        Returns ``total_debit`` / ``total_credit`` / ``balance`` (debit − credit).
+        """
+        zero = Decimal("0.00")
+        if customer_id in (None, ""):
+            return {"total_debit": zero, "total_credit": zero, "balance": zero}
+        company = None if company_id in (None, "") else int(company_id)
+        query = SQL(
+            "SELECT "
+            "(SELECT COALESCE(SUM(si.total_including_vat), 0) FROM sales_invoices si "
+            " WHERE si.customer_id = %(c)s AND (%(co)s::int IS NULL OR si.seller_company_id = %(co)s::int) "
+            " AND si.issue_datetime < (%(d)s::date + INTERVAL '1 day')) AS total_debit, "
+            "(SELECT COALESCE(SUM(si.total_including_vat), 0) FROM sales_invoices si "
+            " WHERE si.customer_id = %(c)s AND (%(co)s::int IS NULL OR si.seller_company_id = %(co)s::int) "
+            " AND si.issue_datetime < (%(d)s::date + INTERVAL '1 day') "
+            " AND lower(si.payment_type) = 'cash') "
+            "+ (SELECT COALESCE(SUM(rv.amount), 0) FROM receipt_vouchers rv "
+            " WHERE rv.customer_id = %(c)s AND (%(co)s::int IS NULL OR rv.company_id = %(co)s::int) "
+            " AND rv.voucher_date <= %(d)s::date) AS total_credit"
+        )
+        params = {"c": int(customer_id), "co": company, "d": str(as_of)[:10]}
+        with self.connect() as conn:
+            row = conn.execute(query, params).fetchone() or {}
+        debit = Decimal(str(row.get("total_debit") or 0)).quantize(Decimal("0.01"))
+        credit = Decimal(str(row.get("total_credit") or 0)).quantize(Decimal("0.01"))
+        return {"total_debit": debit, "total_credit": credit, "balance": debit - credit}
+
+    def peek_next_balance_confirmation_number(self) -> str:
+        """The BC-<n> the sequence will hand out next (hint only, never stored)."""
+        with self.connect() as conn:
+            row = conn.execute(
+                "SELECT last_value, is_called FROM balance_confirmation_number_seq"
+            ).fetchone()
+        value = int(row["last_value"]) + (1 if row["is_called"] else 0)
+        return f"BC-{value:03d}"
+
+    def register_manual_balance_confirmation_number(self, number: Any) -> None:
+        """Move the sequence past a manual «BC-<n>» so automatic numbers never
+        collide with it. Forward-only: a smaller manual number changes nothing."""
+        text = "" if number is None else str(number).strip()
+        if not text.upper().startswith("BC-") or not text[3:].isdigit():
+            return
+        with self.connect() as conn:
+            conn.execute(
+                "SELECT setval('balance_confirmation_number_seq', %(n)s, true) "
+                "FROM balance_confirmation_number_seq "
+                "WHERE (CASE WHEN is_called THEN last_value ELSE last_value - 1 END) < %(n)s",
+                {"n": int(text[3:])},
+            )
 
     def list_companies_for_selection(self) -> list[dict[str, Any]]:
         query = SQL("SELECT id, name_ar FROM companies ORDER BY name_ar ASC")
@@ -864,6 +1018,20 @@ class ReviewDataService:
             # atomically (concurrency-safe; never MAX+1). On update this simply
             # leaves the stored number unchanged.
             clean_payload.pop("voucher_number", None)
+
+        if spec.key == "balance_confirmations":
+            # Empty number = automatic BC-<n> (same rule as receipt vouchers).
+            if clean_payload.get("confirmation_number") is None:
+                clean_payload.pop("confirmation_number", None)
+            # The balance is never trusted from the form: recompute it from the
+            # statement for this customer / company / date at save time.
+            clean_payload.update(
+                self.customer_balance(
+                    clean_payload.get("customer_id"),
+                    clean_payload.get("company_id"),
+                    clean_payload.get("confirmation_date"),
+                )
+            )
 
         if spec.key == "products" and clean_payload.get("item_code") is None:
             # كود الصنف is now user-editable. A blank code means "automatic": drop

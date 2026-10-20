@@ -67,6 +67,10 @@ RIGHT_ALIGNED_FIELDS = {
         "voucher_date",
         "amount",
     },
+    "balance_confirmations": {
+        "confirmation_number",
+        "confirmation_date",
+    },
     "units": {
         "unit_id",
         "unit_code",

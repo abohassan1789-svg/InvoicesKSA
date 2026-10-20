@@ -1,0 +1,38 @@
+.env
+.pytest_cache/
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.spec
+*.log
+app/logs/
+daily_followup_report_settings.json
+daily_followup_smart_report_exports/
+
+# Installer build artifacts
+installer/dist/
+installer/build/
+installer/Output/
+installer/.buildvenv/
+_test_conn.json
+_cloud.json
+_t2.json
+
+# Build outputs (installer_final / installer_trial)
+.buildvenv/
+build/
+dist/
+Output/
+payload/
+
+# Never publish customer data, backups or local config
+Backups/
+*.pdf
+*.xlsx
+*.bak
+*.dump
+.tmp_access_export/
+config/crm-connection*.json
+*_settings.json
+scratchpad/

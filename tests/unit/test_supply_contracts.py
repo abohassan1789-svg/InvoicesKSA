@@ -416,3 +416,19 @@ def test_print_asks_for_a_layout_and_uses_it(screen, monkeypatch):
     screen.print_contract()
     assert shown and shown[0][1] is sentinel
     assert shown[0][0]["contract_number"] == "CT-0012"
+
+
+def test_list_hidden_and_party_name_address_span_full_width(screen):
+    """User 2026-10-21: no list under the form; names / addresses get whole rows."""
+    assert not screen.list_panel.isVisibleTo(screen)
+    for group, wide in (("الطرف الأول", ("first_party_name", "first_party_address")),
+                        ("الطرف الثاني", ("second_party_name", "second_party_address",
+                                          "second_party_branches"))):
+        grid = screen.group_boxes[group].layout()
+        for name in wide:
+            index = grid.indexOf(screen.inputs[name])
+            if index < 0:   # the editor may sit inside a wrapper widget
+                index = next(i for i in range(grid.count())
+                             if screen.inputs[name] in grid.itemAt(i).widget().findChildren(type(screen.inputs[name])))
+            _row, column, _rows, span = grid.getItemPosition(index)
+            assert (column, span) == (1, 3), name

@@ -5,8 +5,10 @@ dropped the side-by-side live preview on 2026-10-20): the usual green header
 and CRUD toolbar, then
 
 * البيانات الأساسية (with «طباعة الختم») beside التوريد والسداد;
-* الطرف الأول beside الطرف الثاني;
-* the list of saved contracts underneath (also F1).
+* الطرف الأول beside الطرف الثاني, each name and address on a full-width row.
+
+Saved contracts are opened with «F1 بحث»; the list panel underneath was
+removed from view on 2026-10-21 so the parties get the room.
 
 The contract itself is seen in «طباعة العقد», which asks for one of the six
 print layouts and opens the preview / PDF / print window.
@@ -56,6 +58,26 @@ FORM_ROWS: tuple[tuple[tuple[str, int, int], ...], ...] = (
     (("الطرف الأول", 2, 1), ("الطرف الثاني", 2, 1)),
 )
 
+# Each party box, top to bottom: a name alone on a row = it spans the box's full
+# width (long names / addresses show whole, user 2026-10-21); a pair shares a row.
+PARTY_ROWS: dict[str, tuple[tuple[str, ...], ...]] = {
+    "الطرف الأول": (
+        ("first_party_name",),
+        ("first_party_address",),
+        ("first_party_cr", "first_party_cr_city"),
+        ("first_party_rep_name", "first_party_rep_nationality"),
+        ("first_party_rep_id", "first_party_rep_title"),
+    ),
+    "الطرف الثاني": (
+        ("second_party_name",),
+        ("second_party_address",),
+        ("second_party_cr", "second_party_cr_city"),
+        ("second_party_branches",),
+        ("second_party_rep_name", "second_party_rep_nationality"),
+        ("second_party_rep_id", "second_party_rep_title"),
+    ),
+}
+
 
 class SupplyContractsScreen(BaseCrudScreen):
     SPEC_KEY = "supply_contracts"
@@ -96,7 +118,10 @@ class SupplyContractsScreen(BaseCrudScreen):
             line.setSpacing(10)
             for group, columns, share in row:
                 fields = [f for f in visible if f.group == group]
-                box = self._build_field_group(group, fields, columns)
+                if group in PARTY_ROWS:
+                    box = self._build_party_group(group, fields)
+                else:
+                    box = self._build_field_group(group, fields, columns)
                 grid = box.layout()
                 grid.setContentsMargins(14, 16, 14, 10)
                 grid.setVerticalSpacing(6)
@@ -104,8 +129,45 @@ class SupplyContractsScreen(BaseCrudScreen):
                 line.addWidget(box, share)
             content.addLayout(line)
         self._add_stamp_checkbox(self.group_boxes["البيانات الأساسية"])
-        content.addWidget(self._build_list_panel(), 1)
+        # The saved-contracts list is not shown (user 2026-10-21: its room goes to
+        # the parties) — contracts are opened with «F1 بحث». The panel is still
+        # built, hidden, because BaseCrudScreen loads / selects records through it.
+        self.list_panel = self._build_list_panel()
+        self.list_panel.setVisible(False)
+        content.addWidget(self.list_panel)
+        content.addStretch(1)
         return content
+
+    def _build_party_group(self, group: str, fields) -> Any:
+        """A party box laid out by :data:`PARTY_ROWS`: label | editor pairs, and a
+        field alone on its row spanning the whole width."""
+        box = self._build_field_group(group, [], 2)   # styled, empty, 2 pairs wide
+        grid = box.layout()
+        by_name = {f.name: f for f in fields}
+        placed = set()
+        for row, names in enumerate(PARTY_ROWS[group]):
+            for pair, name in enumerate(names):
+                field = by_name[name]
+                label = QLabel(field.label)
+                label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+                label.setLayoutDirection(Qt.RightToLeft)
+                label.setMinimumWidth(90)
+                label.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
+                editor = self._make_editor(field)
+                self.inputs[field.name] = editor
+                span = 3 if len(names) == 1 else 1
+                grid.addWidget(label, row, pair * 2)
+                grid.addWidget(self._field_editor_widget(field, editor), row, pair * 2 + 1, 1, span)
+                placed.add(name)
+        # A field added to the spec later still shows, one per row, at the end.
+        for row, field in enumerate((f for f in fields if f.name not in placed), start=len(PARTY_ROWS[group])):
+            label = QLabel(field.label)
+            label.setStyleSheet(f"font-size:14px; font-weight:900; color:{TEXT};")
+            editor = self._make_editor(field)
+            self.inputs[field.name] = editor
+            grid.addWidget(label, row, 0)
+            grid.addWidget(self._field_editor_widget(field, editor), row, 1, 1, 3)
+        return box
 
     def _add_stamp_checkbox(self, box) -> None:
         """«طباعة الختم» in the free cell after اليوم."""

@@ -196,6 +196,37 @@ class CustomerStatementReportService:
         except Exception:  # noqa: BLE001 - never break a print over the letterhead
             return None
 
+    def invoice_vat_breakdown(self, rows: list[dict[str, Any]]) -> dict[Any, dict[str, Decimal]]:
+        """``{source_id: {"taxable", "vat"}}`` for the invoice rows of a result.
+
+        Only the invoice debit rows (``source_type == "sales_invoice"``) are looked
+        up; the cash-settlement and voucher rows carry no VAT.
+        """
+        ids = [r.get("source_id") for r in rows
+               if r.get("source_type") == "sales_invoice" and r.get("source_id") is not None]
+        if not ids:
+            return {}
+        try:
+            found = self.repository.fetch_invoice_vat(ids)
+        except Exception:  # noqa: BLE001
+            return {}
+        return {
+            r["id"]: {"taxable": self._money(r.get("taxable")), "vat": self._money(r.get("vat"))}
+            for r in found or []
+            if r.get("id") is not None and r.get("taxable") is not None and r.get("vat") is not None
+        }
+
+    def customer_tax_identity(self, customer_id: Any) -> dict[str, Any] | None:
+        """The selected customer's tax identity, or ``None`` for «الكل»."""
+        if customer_id in (None, ""):
+            return None
+        try:
+            return self.repository.fetch_customer_tax_identity(int(customer_id))
+        except (TypeError, ValueError):
+            return None
+        except Exception:  # noqa: BLE001
+            return None
+
     # --- row logic ----------------------------------------------------------
     def _description(self, raw: dict[str, Any]) -> str:
         """The exact Arabic البيان text for each movement type."""

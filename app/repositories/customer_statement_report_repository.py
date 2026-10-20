@@ -318,3 +318,33 @@ class CustomerStatementReportRepository:
             )
         except Exception:  # noqa: BLE001 - the letterhead must never break a print
             return None
+
+    def fetch_invoice_vat(self, invoice_ids: list[int]) -> list[dict[str, Any]]:
+        """Taxable amount and VAT of the given sales invoices, for النموذج الرابع عشر.
+
+        The statement query carries only ``total_including_vat``; the VAT
+        statement splits each invoice into its stored ``subtotal_after_discount``
+        (the taxable amount, after any invoice discount) and ``vat_total``.
+        """
+        if not invoice_ids:
+            return []
+        try:
+            return self.db.fetch_all(
+                "SELECT id, subtotal_after_discount AS taxable, vat_total AS vat "
+                "FROM sales_invoices WHERE id = ANY(%s)",
+                [[int(i) for i in invoice_ids]],
+            )
+        except Exception:  # noqa: BLE001 - never break a print over the breakdown
+            return []
+
+    def fetch_customer_tax_identity(self, customer_id: int) -> dict[str, Any] | None:
+        """The customer's name, VAT number, CR and address, for the VAT statement's
+        «العميل» block."""
+        try:
+            return self.db.fetch_one(
+                "SELECT customer_id AS id, customer_name, vat_number, cr, address "
+                "FROM customers WHERE customer_id = %s",
+                [int(customer_id)],
+            )
+        except Exception:  # noqa: BLE001 - never break a print over the identity
+            return None

@@ -309,3 +309,44 @@ def test_customer_id_is_passed_to_repository_as_int():
     svc = _service([])
     svc.fetch_report(CustomerStatementRequest(customer_id="29582"))
     assert svc.repository.fetch_calls[0].customer_id == 29582
+
+
+# ---------------------------------------------------------------------------
+# النموذج الرابع عشر: the VAT breakdown and the customer's tax identity
+# ---------------------------------------------------------------------------
+class _VatRepo(_FakeRepo):
+    def __init__(self):
+        super().__init__([])
+        self.asked: list = []
+
+    def fetch_invoice_vat(self, ids):
+        self.asked.append(list(ids))
+        return [{"id": 1, "taxable": Decimal("100"), "vat": Decimal("15")}]
+
+    def fetch_customer_tax_identity(self, customer_id):
+        return {"id": customer_id, "customer_name": "عميل", "vat_number": "300", "cr": "1", "address": "جدة"}
+
+
+def test_vat_breakdown_reads_only_the_invoice_debit_rows() -> None:
+    repo = _VatRepo()
+    service = CustomerStatementReportService(repository=repo)
+    rows = [
+        {"source_type": "sales_invoice", "source_id": 1},
+        {"source_type": "cash_invoice_payment", "source_id": 1},
+        {"source_type": "receipt_voucher", "source_id": 9},
+    ]
+    assert service.invoice_vat_breakdown(rows) == {1: {"taxable": Decimal("100.00"), "vat": Decimal("15.00")}}
+    assert repo.asked == [[1]]
+
+
+def test_vat_breakdown_skips_the_query_without_invoices() -> None:
+    repo = _VatRepo()
+    service = CustomerStatementReportService(repository=repo)
+    assert service.invoice_vat_breakdown([{"source_type": "receipt_voucher", "source_id": 9}]) == {}
+    assert repo.asked == []
+
+
+def test_customer_tax_identity_is_none_for_every_customer() -> None:
+    service = CustomerStatementReportService(repository=_VatRepo())
+    assert service.customer_tax_identity(None) is None
+    assert service.customer_tax_identity(5)["vat_number"] == "300"

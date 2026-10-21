@@ -2,6 +2,29 @@
 
 Last updated: 2026-09-19
 
+## «أفنان جيزان» — Invoice Replica (added 2026-10-21)
+
+A layout replica of the user's ``شركة افنان جيزان للتجارة _ 0352.pdf`` (seller
+شركة عبير النخبة → buyer شركة افنان جيزان للتجارة), added as **option 24, the last
+of both invoice pickers**, under the name **«أفنان جيزان»**:
+
+- Module `saudi_invoice_print_v29.py` (`build_invoice_html_v29`): geometry kept
+  in the source's A4 points and scaled ×816/595 onto the Letter sheet. Seller
+  (English block from `name_en` / `address_en`, Arabic block, logo + short English
+  name), buyer («Bill to», mobile from `customers.phone_number` → new
+  `customer["phone"]` key in both data collectors), items, totals, words and stamp
+  are live. Fixed: captions and «طريقة الدفع: نقدا» (the source prints it whatever
+  the type); «نوع الفاتورة» is «Credit | آجل» / «Cash | نقدي» from the payment.
+- Table has no unit column (as the source; `show_unit` is ignored); «VAT x» is
+  the per-unit tax (price × rate). «إظهار وصف الصنف» adds a «وصف الصنف» column.
+- Fonts: Inter bundled (`inter_latin_{400,600,700,800}.woff2`, SIL OFL), Arabic
+  and table figures in Arial (Windows), fallback the bundled Noto Naskh Arabic.
+- QR is the shared `QR_PRINT_PX` (larger than the source), so the totals band is
+  ~36px taller than the PDF; «المبلغ المستحق» absorbs it. Paginates through
+  `invoice_pagination` (header repeats; totals + words box on the last page).
+- Phase-2 → `build_invoice_html_v29` (signed tags 1–9); «مرحلة أولى» →
+  `build_phase1_invoice_afnan` (tags 1–5). Tests: `tests/unit/test_invoice_print_v29.py`.
+
 ## «عقود التوريد» Supply Contracts Screen (added 2026-10-20)
 
 A new CRM screen (sidebar: **عقود التوريد**, after مصادقة على الرصيد) for the

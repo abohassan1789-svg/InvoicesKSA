@@ -871,15 +871,16 @@ class InvoiceTemplateChoiceDialog(QDialog):
         # Lay the template buttons out for the caller (Phase-2 invoices + receipt
         # vouchers ask for "vertical"): a wide horizontal row of a dozen buttons
         # reads badly, and a single tall column runs off the screen — so the
-        # vertical callers use a TWO-COLUMN grid, which keeps each button a good
-        # width while roughly halving the height (user request 2026-08-22). The
-        # default stays a horizontal row so the other callers (مرحلة أولى, كشف
-        # الحساب) are untouched.
+        # vertical callers use a THREE-COLUMN grid (was two, user request
+        # 2026-10-21) inside a bigger dialog, so the picker holds more templates
+        # without running off the screen; a scroll area takes over if the list
+        # ever outgrows it. The default stays a horizontal row so the other
+        # callers are untouched.
         vertical = orientation == "vertical"
         if vertical:
-            from PySide6.QtWidgets import QGridLayout
+            from PySide6.QtWidgets import QFrame, QGridLayout, QScrollArea
 
-            grid_columns = 2
+            grid_columns = 3
             buttons = QGridLayout()
             buttons.setSpacing(10)
         else:
@@ -887,8 +888,8 @@ class InvoiceTemplateChoiceDialog(QDialog):
             buttons.setSpacing(10)
         for index, label in enumerate(options, start=1):
             button = QPushButton(label)
-            button.setFixedHeight(44)
-            button.setMinimumWidth(240 if vertical else 150)
+            button.setFixedHeight(46 if vertical else 44)
+            button.setMinimumWidth(200 if vertical else 150)
             button.setCursor(Qt.PointingHandCursor)
             style_button(button, _CHOICE_BUTTON_KINDS[(index - 1) % len(_CHOICE_BUTTON_KINDS)])
             button.clicked.connect(lambda _checked=False, i=index: self._pick(i))
@@ -897,7 +898,27 @@ class InvoiceTemplateChoiceDialog(QDialog):
                 buttons.addWidget(button, row, col)
             else:
                 buttons.addWidget(button)
-        root.addLayout(buttons)
+        if vertical:
+            holder = QWidget()
+            holder.setObjectName("templateButtons")
+            holder.setStyleSheet("#templateButtons{background:transparent;}")
+            holder.setLayout(buttons)
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QFrame.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+            scroll.viewport().setAutoFillBackground(False)
+            scroll.setWidget(holder)
+            root.addWidget(scroll, 1)
+            rows = -(-len(options) // grid_columns)
+            wanted_w, wanted_h = 960, 150 + rows * 56
+            screen = self.screen().availableGeometry() if self.screen() else None
+            if screen is not None:
+                wanted_w = min(wanted_w, screen.width() - 60)
+                wanted_h = min(wanted_h, screen.height() - 80)
+            self.resize(wanted_w, max(wanted_h, 420))
+        else:
+            root.addLayout(buttons)
 
         cancel_button = QPushButton("إلغاء")
         cancel_button.setFixedHeight(34)
@@ -919,8 +940,8 @@ def choose_invoice_template(
 ) -> int | None:
     """Prompt for a template; return its 1-based index or ``None`` if cancelled.
 
-    ``orientation="vertical"`` stacks the template buttons in a single column
-    (used by the Phase-2 invoice preview/print/PDF picker and the receipt-voucher
+    ``orientation="vertical"`` lays the template buttons out in a three-column
+    grid inside a larger dialog (used by the Phase-2 invoice preview/print/PDF picker and the receipt-voucher
     picker); the default lays them out in a horizontal row.
     """
     dialog = InvoiceTemplateChoiceDialog(action_label, parent, options, orientation)

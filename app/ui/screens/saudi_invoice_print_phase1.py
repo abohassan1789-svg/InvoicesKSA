@@ -1806,6 +1806,9 @@ PHASE1_TEMPLATE_OPTIONS: tuple[str, ...] = (
     # «زيادة البركة» (v28) — نسخة طبق الأصل من PDF المستخدم (طلب 2026-10-20)؛
     # هنا بـ QR المرحلة الأولى (تاجات ١–٥).
     "النموذج الثاني والعشرون",
+    # «موسم الفاكهة» (v13، build_phase1_invoice_mawsim) أُعيد إظهاره في المرحلتين
+    # بناءً على طلب المستخدم (2026-10-21)؛ هنا بـ QR المرحلة الأولى (تاجات ١–٥).
+    "موسم الفاكهة",
 )
 
 # 1-based template index -> its HTML builder (None = reserved / not built yet).
@@ -1838,6 +1841,7 @@ _PHASE1_BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     20: build_phase1_invoice_timeline, # v27 «الخط الزمني», Phase-1 QR
     21: build_phase1_invoice_atyaf,    # v14 «نهلة الخليج», Phase-1 QR
     22: build_phase1_invoice_barakah,  # v28 «زيادة البركة», Phase-1 QR
+    23: build_phase1_invoice_mawsim,   # v13 «موسم الفاكهة», Phase-1 QR (re-shown 2026-10-21)
 }
 
 

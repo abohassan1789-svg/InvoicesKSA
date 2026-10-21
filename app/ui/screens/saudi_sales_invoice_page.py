@@ -2619,9 +2619,10 @@ class SaudiSalesInvoicePage(QWidget):
         from app.ui.screens.saudi_invoice_print_v6 import build_invoice_html_v6
         from app.ui.screens.saudi_invoice_print_v7 import build_invoice_html_v7
         from app.ui.screens.saudi_invoice_print_v8 import build_invoice_html_v8
-        # «مواسم الفاكهة» (v13) و«دروب الاتحاد»…«نوافذ» (v15–v21) أُخفيت من المُنتقي
-        # بناءً على طلب المستخدم (2026-10-17)؛ ملفات البناء ما زالت موجودة ويمكن
-        # إعادة إدراجها لاحقًا.
+        # «دروب الاتحاد»…«نوافذ» (v15–v21) أُخفيت من المُنتقي بناءً على طلب المستخدم
+        # (2026-10-17)؛ ملفات البناء ما زالت موجودة ويمكن إعادة إدراجها لاحقًا.
+        # «موسم الفاكهة» (v13) أُخفي معها ثم أُعيد في آخر القائمة (طلب 2026-10-21).
+        from app.ui.screens.saudi_invoice_print_v13 import build_invoice_html_v13
         # النماذج الخامس عشر/السادس عشر/السابع عشر — تصاميم جديدة اختارها المستخدم من
         # معرض الموك أب (2026-10-18)؛ نفسها في «مرحلة أولى» بـ QR المرحلة الأولى.
         from app.ui.screens.saudi_invoice_print_v22 import build_invoice_html_v22
@@ -2664,6 +2665,7 @@ class SaudiSalesInvoicePage(QWidget):
             "النموذج العشرون",      # «الخط الزمني»
             "نهلة الخليج",          # v14، بـ QR المرحلة الثانية الموقّع
             "النموذج الثاني والعشرون",  # v28 «زيادة البركة»، بـ QR المرحلة الثانية الموقّع
+            "موسم الفاكهة",         # v13، بـ QR المرحلة الثانية الموقّع
         )
         choice = choose_invoice_template(parent or self, action_label, options, orientation="vertical")
         if choice is None:
@@ -2692,6 +2694,7 @@ class SaudiSalesInvoicePage(QWidget):
             20: build_invoice_html_v27,       # «الخط الزمني»
             21: build_invoice_html_v14,       # «نهلة الخليج»
             22: build_invoice_html_v28,       # «النموذج الثاني والعشرون»
+            23: build_invoice_html_v13,       # «موسم الفاكهة»
         }.get(choice, build_invoice_html)
 
     def print_menu_actions(self) -> "tuple[tuple[str, str, str, Callable[[], None]], ...]":

@@ -25,6 +25,7 @@ _BUILDERS = [
     ("saudi_invoice_print_v18", "build_invoice_html_v18", "الوصف"),
     ("saudi_invoice_print_v19", "build_invoice_html_v19", "الوصف"),
     ("saudi_invoice_print_v28", "build_invoice_html_v28", "وصف الصنف"),
+    ("saudi_invoice_print_v29", "build_invoice_html_v29", "وصف الصنف"),
 ]
 _IDS = [fn for _m, fn, _t in _BUILDERS]
 

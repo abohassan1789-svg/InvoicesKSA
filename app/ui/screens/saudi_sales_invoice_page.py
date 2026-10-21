@@ -2506,6 +2506,7 @@ class SaudiSalesInvoicePage(QWidget):
                 "address": customer.get("address") or "",
                 "vat": customer.get("vat_number") or self.customer_vat_input.text().strip(),
                 "cr": customer.get("cr") or customer.get("commercial_registration") or "",
+                "phone": customer.get("phone_number") or "",
             },
             "lines": lines,
             "totals": {
@@ -2636,6 +2637,8 @@ class SaudiSalesInvoicePage(QWidget):
         from app.ui.screens.saudi_invoice_print_v14 import build_invoice_html_v14
         # «النموذج الثاني والعشرون» (v28) — نسخة من PDF «زيادة البركة» (2026-10-20).
         from app.ui.screens.saudi_invoice_print_v28 import build_invoice_html_v28
+        # «أفنان جيزان» (v29) — نسخة من PDF فاتورة شركة عبير النخبة (2026-10-21).
+        from app.ui.screens.saudi_invoice_print_v29 import build_invoice_html_v29
         # النماذج التاسع/العاشر/الحادي عشر = أول ثلاثة تصاميم من «مرحلة أولى» بنفس
         # الشكل، لكن بـ QR المرحلة الثانية الموقّع (٩ تاجات) عند الطباعة من هنا.
         from app.ui.screens.saudi_invoice_print_phase1 import (
@@ -2666,6 +2669,7 @@ class SaudiSalesInvoicePage(QWidget):
             "نهلة الخليج",          # v14، بـ QR المرحلة الثانية الموقّع
             "النموذج الثاني والعشرون",  # v28 «زيادة البركة»، بـ QR المرحلة الثانية الموقّع
             "موسم الفاكهة",         # v13، بـ QR المرحلة الثانية الموقّع
+            "أفنان جيزان",          # v29، بـ QR المرحلة الثانية الموقّع
         )
         choice = choose_invoice_template(parent or self, action_label, options, orientation="vertical")
         if choice is None:
@@ -2695,6 +2699,7 @@ class SaudiSalesInvoicePage(QWidget):
             21: build_invoice_html_v14,       # «نهلة الخليج»
             22: build_invoice_html_v28,       # «النموذج الثاني والعشرون»
             23: build_invoice_html_v13,       # «موسم الفاكهة»
+            24: build_invoice_html_v29,       # «أفنان جيزان»
         }.get(choice, build_invoice_html)
 
     def print_menu_actions(self) -> "tuple[tuple[str, str, str, Callable[[], None]], ...]":
@@ -3187,6 +3192,7 @@ class SaudiSalesInvoicePage(QWidget):
                 "address": header.get("customer_address_snapshot") or customer_full.get("address") or "",
                 "vat": header.get("customer_vat_number_snapshot") or "",
                 "cr": customer_full.get("cr") or customer_full.get("commercial_registration") or "",
+                "phone": customer_full.get("phone_number") or "",
             },
             "lines": lines,
             "totals": {

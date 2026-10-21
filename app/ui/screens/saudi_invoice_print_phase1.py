@@ -78,6 +78,7 @@ from app.ui.screens.saudi_invoice_print_v25 import build_invoice_html_v25
 from app.ui.screens.saudi_invoice_print_v26 import build_invoice_html_v26
 from app.ui.screens.saudi_invoice_print_v27 import build_invoice_html_v27
 from app.ui.screens.saudi_invoice_print_v28 import build_invoice_html_v28
+from app.ui.screens.saudi_invoice_print_v29 import build_invoice_html_v29
 
 # Warm-amber identity (النموذج السادس).
 _BROWN = "#7c2d12"
@@ -1700,6 +1701,12 @@ def build_phase1_invoice_barakah(data: dict[str, Any]) -> str:
     return build_invoice_html_v28({**data, "qr_payload": _phase1_qr_payload(data)})
 
 
+def build_phase1_invoice_afnan(data: dict[str, Any]) -> str:
+    """«أفنان جيزان» — the replica of the user's 0352 invoice
+    (:func:`build_invoice_html_v29`) with the Phase-1 tags 1–5 QR."""
+    return build_invoice_html_v29({**data, "qr_payload": _phase1_qr_payload(data)})
+
+
 # ----------------------------------------------------------------------
 # Phase-2 native layouts (النموذج الأول → الثامن) reused inside «مرحلة أولى»
 # ----------------------------------------------------------------------
@@ -1809,6 +1816,9 @@ PHASE1_TEMPLATE_OPTIONS: tuple[str, ...] = (
     # «موسم الفاكهة» (v13، build_phase1_invoice_mawsim) أُعيد إظهاره في المرحلتين
     # بناءً على طلب المستخدم (2026-10-21)؛ هنا بـ QR المرحلة الأولى (تاجات ١–٥).
     "موسم الفاكهة",
+    # «أفنان جيزان» (v29) — نسخة طبق الأصل من PDF فاتورة المستخدم (طلب 2026-10-21)؛
+    # هنا بـ QR المرحلة الأولى (تاجات ١–٥).
+    "أفنان جيزان",
 )
 
 # 1-based template index -> its HTML builder (None = reserved / not built yet).
@@ -1842,6 +1852,7 @@ _PHASE1_BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     21: build_phase1_invoice_atyaf,    # v14 «نهلة الخليج», Phase-1 QR
     22: build_phase1_invoice_barakah,  # v28 «زيادة البركة», Phase-1 QR
     23: build_phase1_invoice_mawsim,   # v13 «موسم الفاكهة», Phase-1 QR (re-shown 2026-10-21)
+    24: build_phase1_invoice_afnan,    # v29 «أفنان جيزان», Phase-1 QR (added 2026-10-21)
 }
 
 

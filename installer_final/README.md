@@ -19,8 +19,12 @@ D:\PHASEINV2\dist\PHASEINV2_Setup.exe
 ## البناء بأمر واحد
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File "D:\PHASEINV2\CRM_PYTHON_APP_STRUCTURE\installer_final\build.ps1"
+powershell -ExecutionPolicy Bypass -File "D:\PHASEINV2\InvoicesKSA_publish\installer_final\build.ps1"
 ```
+
+> من 2026-10-21 (v4.15.0) البناء من `InvoicesKSA_publish` (مش `CRM_PYTHON_APP_STRUCTURE`
+> القديم). نسخ المكتبات مثبّتة في `build-constraints.txt` (نفس بناء v4.14.0)، فالـ
+> `.buildvenv` الجديدة بتطلع نفس الحزمة. أي تحديث لمكتبة يتعمل هناك عن قصد.
 
 > ⚠️ لا تمرّر السكربت عبر `2>&1` على PowerShell 5.1: PyInstaller يكتب رسائل INFO
 > على stderr، والـ redirect يحوّل كل سطر إلى `NativeCommandError` فيبلّغ عن فشل
@@ -80,6 +84,7 @@ powershell -ExecutionPolicy Bypass -File "D:\PHASEINV2\CRM_PYTHON_APP_STRUCTURE\
 | `setup.iss` | سكربت Inno Setup للمُثبِّت الموحّد (محلي + شبكة). |
 | `app.spec` | مواصفات PyInstaller لواجهة التطبيق (onedir). |
 | `config.spec` | مواصفات PyInstaller لأداة الإعداد (onefile). |
+| `build-constraints.txt` | النسخ المثبّتة للمكتبات وقت البناء (`pip -c`). |
 | `entrypoints\app_main.py` | نقطة دخول واجهة التطبيق المُجمَّدة. |
 | `entrypoints\config_main.py` | نقطة دخول أداة الإعداد المُجمَّدة. |
 

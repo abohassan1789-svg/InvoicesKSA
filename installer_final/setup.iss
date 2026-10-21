@@ -48,7 +48,14 @@
 ;   - sales_invoice_lines.item_description (وصف الصنف, nullable) + «إظهار وصف الصنف».
 ;   - companies.commercial_registration optional (DROP NOT NULL + not-blank CHECK).
 ;   - New invoice templates v14..v21, vouchers v10..v12, print-option tweaks.
-#define MyAppVersion "4.14.0"
+; v4.15.0 (2026-10-21): ADDITIVE schema only (two NEW tables, no existing table
+;   touched), safe for a returning client's DB. First build from InvoicesKSA_publish:
+;   - «مصادقة على الرصيد» screen (balance_confirmations, migration 021) + 4 layouts.
+;   - «عقود التوريد» screen (supply_contracts + show_stamp, migrations 022/023) + 5 layouts.
+;   - Invoice templates v22..v28 («نهلة الخليج» = choice 21, «البركة» = choice 22),
+;     customer statements 4..23 (stamp on all), receipt vouchers 16..23,
+;     embedded Noto Naskh Arabic fonts.
+#define MyAppVersion "4.15.0"
 #define MyAppPublisher "PHASEINV2"
 #define MyAppExeName "PHASEINV2.exe"
 #define ConfigExeName "phaseinv2-config.exe"

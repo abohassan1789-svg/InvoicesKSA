@@ -5,6 +5,7 @@ __pycache__/
 *.pyo
 *.pyd
 *.spec
+!installer_final/*.spec
 *.log
 app/logs/
 daily_followup_report_settings.json

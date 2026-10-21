@@ -37,7 +37,7 @@ function Write-Ok($m)   { Write-Host "[OK] $m" -ForegroundColor Green }
 function Write-Err($m)  { Write-Host "[!!] $m" -ForegroundColor Red }
 
 $InstallerDir = Split-Path -Parent $MyInvocation.MyCommand.Path   # ...\installer_final
-$ProjectRoot  = Split-Path -Parent $InstallerDir                  # ...\CRM_PYTHON_APP_STRUCTURE
+$ProjectRoot  = Split-Path -Parent $InstallerDir                  # ...\InvoicesKSA_publish
 $RepoRoot     = Split-Path -Parent $ProjectRoot                   # D:\PHASEINV2
 $VenvDir      = Join-Path $InstallerDir '.buildvenv'
 $DistDir      = Join-Path $InstallerDir 'dist'
@@ -46,12 +46,13 @@ $OutputDir    = Join-Path $InstallerDir 'Output'
 $IssPath      = Join-Path $InstallerDir 'setup.iss'
 $AppSpec      = Join-Path $InstallerDir 'app.spec'
 $ConfigSpec   = Join-Path $InstallerDir 'config.spec'
+$Constraints  = Join-Path $InstallerDir 'build-constraints.txt'
 $FinalName    = 'PHASEINV2_Setup.exe'
 $FinalDistDir = Join-Path $RepoRoot 'dist'
 $FinalPath    = Join-Path $FinalDistDir $FinalName
 
 # --- input validation -------------------------------------------------------
-foreach ($f in @($IssPath, $AppSpec, $ConfigSpec)) {
+foreach ($f in @($IssPath, $AppSpec, $ConfigSpec, $Constraints)) {
     if (-not (Test-Path $f)) { throw "Missing build input: $f" }
 }
 
@@ -105,9 +106,9 @@ if (-not $venvOk) {
     $VenvPython = Join-Path $VenvDir 'Scripts\python.exe'
 }
 
-Write-Step 'Installing build dependencies (requirements.txt + PyInstaller)'
+Write-Step 'Installing build dependencies (requirements.txt + PyInstaller, pinned by build-constraints.txt)'
 & $VenvPython -m pip install --upgrade pip | Out-Null
-& $VenvPython -m pip install -r (Join-Path $ProjectRoot 'requirements.txt') pyinstaller
+& $VenvPython -m pip install -r (Join-Path $ProjectRoot 'requirements.txt') pyinstaller -c $Constraints
 if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
 
 # --- 3) freeze the GUI app --------------------------------------------------
@@ -155,12 +156,20 @@ $templateModules = @(
     'saudi_invoice_print_v12.py', 'saudi_invoice_print_v13.py', 'saudi_invoice_print_v14.py',
     'saudi_invoice_print_v15.py', 'saudi_invoice_print_v16.py', 'saudi_invoice_print_v17.py',
     'saudi_invoice_print_v18.py', 'saudi_invoice_print_v19.py', 'saudi_invoice_print_v20.py',
-    'saudi_invoice_print_v21.py', 'saudi_invoice_print_v28.py',
+    'saudi_invoice_print_v21.py', 'saudi_invoice_print_v22.py', 'saudi_invoice_print_v23.py',
+    'saudi_invoice_print_v24.py', 'saudi_invoice_print_v25.py', 'saudi_invoice_print_v26.py',
+    'saudi_invoice_print_v27.py', 'saudi_invoice_print_v28.py', 'saudi_invoice_print_kit.py',
     'saudi_invoice_print_phase1.py', 'saudi_voucher_print_phase1.py',
     'saudi_receipt_voucher_print.py', 'saudi_receipt_voucher_print_v10.py',
     'saudi_receipt_voucher_print_v11.py', 'saudi_receipt_voucher_print_v12.py',
+    'saudi_receipt_voucher_print_gallery.py',
     'saudi_simplified_invoice_print.py', 'customer_statement_print.py',
-    'cashier_receipt_print.py', 'invoice_pagination.py'
+    'cashier_receipt_print.py', 'invoice_pagination.py',
+    # v4.15.0 (2026-10-21): the two new screens and their print layouts.
+    'balance_confirmations_screen.py', 'balance_confirmation_print.py',
+    'balance_confirmation_print_templates.py',
+    'supply_contracts_screen.py', 'supply_contract_print.py',
+    'supply_contract_print_templates.py'
 )
 foreach ($m in $templateModules) {
     $checks["print template: $m"] = (Test-Path (Join-Path $screensDir $m))
@@ -172,6 +181,25 @@ foreach ($a in @('atyaf_header.png', 'atyaf_footer.png', 'riyal_symbol.png', 'ma
 }
 foreach ($k in $checks.Keys) {
     if ($checks[$k]) { Write-Ok "bundled: $k" } else { Write-Err "NOT FOUND in bundle: $k"; $missing += $k }
+}
+
+# The installer must never carry the developer's data or secrets: the client keeps
+# its own database. (v4.14.0 and earlier shipped .tmp_access_export\*.csv by mistake.)
+# Names are checked across the whole bundle; data-file extensions only under the
+# app package (third-party libraries may legitimately ship .csv/.pdf files).
+$leaks = @(Get-ChildItem -Path (Join-Path $DistDir 'PHASEINV2') -Recurse -Force -ErrorAction SilentlyContinue |
+    Where-Object {
+        $_.Name -in @('.env', '.tmp_access_export') -or
+        $_.Name -like 'crm-connection*.json' -or
+        $_.Extension -in @('.dump', '.bak')
+    })
+$leaks += @(Get-ChildItem -Path (Join-Path $internal 'app') -Recurse -Force -ErrorAction SilentlyContinue |
+    Where-Object { $_.Extension -in @('.csv', '.pdf', '.xlsx', '.json') -or $_.Name -eq 'Backups' })
+if ($leaks.Count -gt 0) {
+    foreach ($l in $leaks) { Write-Err "must not ship: $($l.FullName)" }
+    $missing += 'no developer data/secrets in bundle'
+} else {
+    Write-Ok 'no developer data/secrets in bundle'
 }
 
 # Runtime smoke test: the frozen config helper exercises the packaged app.config

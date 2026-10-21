@@ -1,0 +1,45 @@
+# Exact package versions of the last good installer build (v4.14.0, 2026-10-07),
+# from its .buildvenv `pip freeze`. build.ps1 installs requirements.txt with
+# `-c build-constraints.txt` so a fresh build venv reproduces the same bundle.
+# Bump a version here deliberately (and re-test printing) - never implicitly.
+altgraph==0.17.5
+annotated-types==0.8.0
+arabic-reshaper==3.0.1
+cffi==2.1.1
+charset-normalizer==3.5.1
+colorama==0.4.6
+cryptography==50.0.0
+docopt==0.6.2
+et_xmlfile==2.0.0
+greenlet==3.5.5
+iniconfig==2.3.0
+num2words==0.5.14
+openpyxl==3.1.5
+packaging==26.3
+pefile==2024.8.26
+pillow==12.3.0
+pluggy==1.6.0
+psycopg==3.3.4
+psycopg-binary==3.3.4
+pycparser==3.0
+pydantic==2.13.4
+pydantic_core==2.46.4
+Pygments==2.21.0
+pyinstaller==6.22.2
+pyinstaller-hooks-contrib==2026.6
+PySide6==6.11.2
+PySide6_Addons==6.11.2
+PySide6_Essentials==6.11.2
+pytest==9.1.1
+python-bidi==0.6.11
+python-dotenv==1.2.3
+pywin32-ctypes==0.2.3
+qrcode==8.2
+QtAwesome==1.4.2
+QtPy==2.4.3
+reportlab==5.0.1
+shiboken6==6.11.2
+SQLAlchemy==2.0.52
+typing-inspection==0.4.4
+typing_extensions==4.16.0
+tzdata==2026.3

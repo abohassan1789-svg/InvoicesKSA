@@ -79,6 +79,7 @@ from app.ui.screens.saudi_invoice_print_v26 import build_invoice_html_v26
 from app.ui.screens.saudi_invoice_print_v27 import build_invoice_html_v27
 from app.ui.screens.saudi_invoice_print_v28 import build_invoice_html_v28
 from app.ui.screens.saudi_invoice_print_v29 import build_invoice_html_v29
+from app.ui.screens.saudi_invoice_print_v30 import build_invoice_html_v30
 
 # Warm-amber identity (النموذج السادس).
 _BROWN = "#7c2d12"
@@ -1707,6 +1708,12 @@ def build_phase1_invoice_afnan(data: dict[str, Any]) -> str:
     return build_invoice_html_v29({**data, "qr_payload": _phase1_qr_payload(data)})
 
 
+def build_phase1_invoice_banshar(data: dict[str, Any]) -> str:
+    """«بنشر» — the replica of the user's «بنشر المشاري» quotation
+    (:func:`build_invoice_html_v30`) with the Phase-1 tags 1–5 QR."""
+    return build_invoice_html_v30({**data, "qr_payload": _phase1_qr_payload(data)})
+
+
 # ----------------------------------------------------------------------
 # Phase-2 native layouts (النموذج الأول → الثامن) reused inside «مرحلة أولى»
 # ----------------------------------------------------------------------
@@ -1819,6 +1826,9 @@ PHASE1_TEMPLATE_OPTIONS: tuple[str, ...] = (
     # «أفنان جيزان» (v29) — نسخة طبق الأصل من PDF فاتورة المستخدم (طلب 2026-10-21)؛
     # هنا بـ QR المرحلة الأولى (تاجات ١–٥).
     "أفنان جيزان",
+    # «بنشر» (v30) — نسخة من PDF عرض أسعار «بنشر المشاري» كفاتورة (طلب 2026-10-22)؛
+    # هنا بـ QR المرحلة الأولى (تاجات ١–٥).
+    "بنشر",
 )
 
 # 1-based template index -> its HTML builder (None = reserved / not built yet).
@@ -1853,6 +1863,7 @@ _PHASE1_BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     22: build_phase1_invoice_barakah,  # v28 «زيادة البركة», Phase-1 QR
     23: build_phase1_invoice_mawsim,   # v13 «موسم الفاكهة», Phase-1 QR (re-shown 2026-10-21)
     24: build_phase1_invoice_afnan,    # v29 «أفنان جيزان», Phase-1 QR (added 2026-10-21)
+    25: build_phase1_invoice_banshar,  # v30 «بنشر», Phase-1 QR (added 2026-10-22)
 }
 
 

@@ -2521,8 +2521,14 @@ class SaudiSalesInvoicePage(QWidget):
         data["show_stamp"] = self._stamp_enabled()
         data["show_unit"] = self._unit_enabled()
         data["show_description"] = self._description_enabled()
+        data["printed_by"] = self._printed_by()
         data["qr_payload"] = self._resolve_qr_payload(data)
         return data
+
+    def _printed_by(self) -> str:
+        """The signed-in user's name, for templates that print «طباعة بواسطة» («بنشر»)."""
+        user = SESSION.user or {}
+        return str(user.get("full_name") or user.get("username") or "")
 
     def _stamp_enabled(self) -> bool:
         """Whether «إظهار الختم» is ticked (drives the invoice-footer stamp).
@@ -2639,6 +2645,8 @@ class SaudiSalesInvoicePage(QWidget):
         from app.ui.screens.saudi_invoice_print_v28 import build_invoice_html_v28
         # «أفنان جيزان» (v29) — نسخة من PDF فاتورة شركة عبير النخبة (2026-10-21).
         from app.ui.screens.saudi_invoice_print_v29 import build_invoice_html_v29
+        # «بنشر» (v30) — نسخة من PDF عرض أسعار «بنشر المشاري» (2026-10-22).
+        from app.ui.screens.saudi_invoice_print_v30 import build_invoice_html_v30
         # النماذج التاسع/العاشر/الحادي عشر = أول ثلاثة تصاميم من «مرحلة أولى» بنفس
         # الشكل، لكن بـ QR المرحلة الثانية الموقّع (٩ تاجات) عند الطباعة من هنا.
         from app.ui.screens.saudi_invoice_print_phase1 import (
@@ -2670,6 +2678,7 @@ class SaudiSalesInvoicePage(QWidget):
             "النموذج الثاني والعشرون",  # v28 «زيادة البركة»، بـ QR المرحلة الثانية الموقّع
             "موسم الفاكهة",         # v13، بـ QR المرحلة الثانية الموقّع
             "أفنان جيزان",          # v29، بـ QR المرحلة الثانية الموقّع
+            "بنشر",                 # v30، بـ QR المرحلة الثانية الموقّع
         )
         choice = choose_invoice_template(parent or self, action_label, options, orientation="vertical")
         if choice is None:
@@ -2700,6 +2709,7 @@ class SaudiSalesInvoicePage(QWidget):
             22: build_invoice_html_v28,       # «النموذج الثاني والعشرون»
             23: build_invoice_html_v13,       # «موسم الفاكهة»
             24: build_invoice_html_v29,       # «أفنان جيزان»
+            25: build_invoice_html_v30,       # «بنشر»
         }.get(choice, build_invoice_html)
 
     def print_menu_actions(self) -> "tuple[tuple[str, str, str, Callable[[], None]], ...]":
@@ -3207,6 +3217,7 @@ class SaudiSalesInvoicePage(QWidget):
         data["show_stamp"] = self._stamp_enabled()
         data["show_unit"] = self._unit_enabled()
         data["show_description"] = self._description_enabled()
+        data["printed_by"] = self._printed_by()
         data["qr_payload"] = self._resolve_qr_payload(data, loaded.get("zatca"))
         return data
 

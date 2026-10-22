@@ -18,7 +18,7 @@ the invoice/voucher money columns (``numeric``).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -215,6 +215,29 @@ class CustomerStatementReportService:
             for r in found or []
             if r.get("id") is not None and r.get("taxable") is not None and r.get("vat") is not None
         }
+
+    def opening_balance(self, request: CustomerStatementRequest) -> Decimal | None:
+        """Debit − credit of every movement before «من», for the same customer and
+        company — the opening balance «ثمار اليرموك» (النموذج الرابع والعشرون)
+        prints. 0.00 when the statement has no start date (nothing precedes it);
+        ``None`` when it cannot be read, so the template prints «—» rather than a
+        made-up figure. The same SELECT as the statement itself, nothing written.
+        """
+        try:
+            customer_id = self._optional_id(request.customer_id, "")
+            company_id = self._optional_id(request.company_id, "")
+            date_from, _date_to = self._validate_dates(request.date_from, request.date_to)
+            if not date_from:
+                return _ZERO
+            day_before = (date.fromisoformat(date_from[:10]) - timedelta(days=1)).isoformat()
+            raw_rows = self.repository.fetch_statement(CustomerStatementFilters(
+                customer_id=customer_id, company_id=company_id, date_from=None, date_to=day_before))
+        except Exception:  # noqa: BLE001 - never break a print over the opening balance
+            return None
+        total = _ZERO
+        for raw in raw_rows or []:
+            total += self._money(raw.get("debit")) - self._money(raw.get("credit"))
+        return total
 
     def customer_tax_identity(self, customer_id: Any) -> dict[str, Any] | None:
         """The selected customer's tax identity, or ``None`` for «الكل»."""

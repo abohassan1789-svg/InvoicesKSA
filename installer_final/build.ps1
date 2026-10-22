@@ -156,7 +156,7 @@ $templateModules = @(
     'saudi_invoice_print_v15.py', 'saudi_invoice_print_v16.py', 'saudi_invoice_print_v17.py',
     'saudi_invoice_print_v18.py', 'saudi_invoice_print_v19.py', 'saudi_invoice_print_v20.py',
     'saudi_invoice_print_v21.py', 'saudi_invoice_print_v28.py', 'saudi_invoice_print_v29.py',
-    'saudi_invoice_print_v30.py',
+    'saudi_invoice_print_v30.py', 'saudi_invoice_print_v31.py',
     'saudi_invoice_print_phase1.py', 'saudi_voucher_print_phase1.py',
     'saudi_receipt_voucher_print.py', 'saudi_receipt_voucher_print_v10.py',
     'saudi_receipt_voucher_print_v11.py', 'saudi_receipt_voucher_print_v12.py',
@@ -170,7 +170,9 @@ $assetsDir = Join-Path $internal 'app\ui\assets\saudi_invoice'
 foreach ($a in @('atyaf_header.png', 'atyaf_footer.png', 'riyal_symbol.png', 'mawsim_fruitseason_logo.png',
                   'noto_naskh_arabic_regular.woff2', 'noto_naskh_arabic_bold.woff2',
                   'inter_latin_400.woff2', 'inter_latin_600.woff2', 'inter_latin_700.woff2',
-                  'inter_latin_800.woff2')) {
+                  'inter_latin_800.woff2', 'cairo_arabic_400.woff2', 'cairo_arabic_600.woff2',
+                  'cairo_arabic_700.woff2', 'cairo_latin_400.woff2', 'cairo_latin_600.woff2',
+                  'cairo_latin_700.woff2', 'dejavu_sans_arabic.woff2')) {
     $checks["print asset: $a"] = (Test-Path (Join-Path $assetsDir $a))
 }
 foreach ($k in $checks.Keys) {

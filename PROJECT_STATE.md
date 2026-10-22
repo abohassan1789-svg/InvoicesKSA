@@ -2,6 +2,37 @@
 
 Last updated: 2026-09-19
 
+## «ثمار اليرموك» — Invoice Replica + Statement Template 24 (added 2026-10-22)
+
+Two replicas of the user's Odoo PDFs (شركة ثمار اليرموك → شركة نورة حزام سعيد الثبيتى):
+
+- **Invoice**, option 26 (last) of both invoice pickers, named **«ثمار اليرموك»**:
+  `saudi_invoice_print_v31.py` (`build_invoice_html_v31`), geometry in the A4
+  source's points scaled ×1056/841.89 onto Letter (as «بنشر»). Live: seller name /
+  stacked address / logo, VAT · CR · invoice / due / supply date strip (all three
+  dates = invoice date), «العميل | Bill to» (address lines, Saudi Arabia, buyer CR
+  line when stored, VAT), items «[code] name», totals box (Discount row only when
+  there is one; «Paid on» = cash invoices only, «Amount Due» = total − paid),
+  shared-size QR, payment-communication line (the bank-account line is dropped —
+  no bank data), stamp under it, issue time + VAT footer. Band follows the rows;
+  paginates via `invoice_pagination`. `address_lines()` splits free-text addresses.
+  Phase-2 → `build_invoice_html_v31`; «مرحلة أولى» → `build_phase1_invoice_yarmouk`.
+  Tests: `tests/unit/test_invoice_print_v31.py`.
+- **Customer statement «النموذج الرابع والعشرون»** (`build_statement_html_v24` in
+  `customer_statement_print.py`): letterhead box (logo | company + address | VAT
+  and CR — CR added), «كشف حساب الشركاء / PARTNER STATEMENT», From/To/Posted/
+  Included chips, partner box, Opening / Period debit / Period credit / Closing
+  cards, report-context bar, opening row, rows with «اليومية | JRNL INV/CSH»,
+  totals row, the source's footer sentence; «Generated <time>» dropped (statements
+  print no issue time, user 2026-07-17). Page «n / N» via an `@page` margin box
+  (installed fonts only — a web font there blanks it). Opening balance =
+  `data["opening_balance"]` from new `CustomerStatementReportService.opening_balance()`
+  (movements before «من»; 0 with no start date; None → «—»).
+- Fonts bundled: Cairo 400/600/700 Arabic + Latin (`cairo_*.woff2`, SIL OFL,
+  Fontsource) and a DejaVu Sans Arabic subset (`dejavu_sans_arabic.woff2`) for the
+  invoice's items head; `font_face_css()` in v31 is shared by both.
+- Samples: `/mnt/project-files/yarmouk-templates/`.
+
 ## «بنشر» — Quotation Replica as an Invoice Template (added 2026-10-22)
 
 A layout replica of the user's ``عرض الأسعار 4000060_1_20261011_2038.PDF`` (بنشر

@@ -44,6 +44,7 @@ from app.ui.screens.saudi_invoice_print_v14 import build_invoice_html_v14
 from app.ui.screens.saudi_invoice_print_v28 import build_invoice_html_v28
 from app.ui.screens.saudi_invoice_print_v29 import build_invoice_html_v29
 from app.ui.screens.saudi_invoice_print_v30 import build_invoice_html_v30
+from app.ui.screens.saudi_invoice_print_v31 import build_invoice_html_v31
 from app.ui.screens.saudi_invoice_print_phase1 import (
     build_phase1_design1_phase2,
     build_phase1_design2_phase2,
@@ -90,6 +91,7 @@ _PHASE2_EXTRA_OPTIONS = (
     "موسم الفاكهة",
     "أفنان جيزان",
     "بنشر",
+    "ثمار اليرموك",
 )
 
 _PHASE2_EXTRA_BUILDERS = {
@@ -110,6 +112,7 @@ _PHASE2_EXTRA_BUILDERS = {
     23: build_invoice_html_v13,  # «موسم الفاكهة», re-shown 2026-10-21
     24: build_invoice_html_v29,  # «أفنان جيزان» replica, added 2026-10-21
     25: build_invoice_html_v30,  # «بنشر» replica, added 2026-10-22
+    26: build_invoice_html_v31,  # «ثمار اليرموك» replica, added 2026-10-22
 }
 
 # Hidden from BOTH pickers (Phase-2 and «مرحلة أولى») on 2026-10-17 —
@@ -183,7 +186,7 @@ def test_phase2_picker_offers_exactly_the_expected_options(page, monkeypatch):
     assert len(captured["options"]) == len(_EXPECTED) + len(_PHASE2_EXTRA_BUILDERS)
     for hidden in ("المتكاملة", "الإسناد الماسي", "اقاسيم") + _HIDDEN_REPLICAS:
         assert hidden not in captured["options"]
-    assert captured["options"][-1] == "بنشر"
+    assert captured["options"][-1] == "ثمار اليرموك"
 
 
 
@@ -309,7 +312,7 @@ def test_phase1_rosters_are_complete():
     new option can never silently fall through to «قيد الإنشاء». The invoice roster
     now mirrors the first 11 Phase-2 templates (المتكاملة/الإسناد الماسي/اقاسيم
     hidden per user request)."""
-    assert len(PHASE1_TEMPLATE_OPTIONS) == len(_PHASE1_BUILDERS) == 25
+    assert len(PHASE1_TEMPLATE_OPTIONS) == len(_PHASE1_BUILDERS) == 26
     for hidden in _HIDDEN_REPLICAS:
         assert hidden not in PHASE1_TEMPLATE_OPTIONS
     assert len(PHASE1_VOUCHER_TEMPLATE_OPTIONS) == len(_PHASE1_VOUCHER_BUILDERS) == 20
@@ -359,6 +362,7 @@ def test_phase1_invoice_roster_mirrors_phase2(page, monkeypatch):
         "موسم الفاكهة",
         "أفنان جيزان",
         "بنشر",
+        "ثمار اليرموك",
     )
 
 
@@ -596,7 +600,7 @@ def test_both_pickers_offer_the_same_names(page, monkeypatch):
     )
     page._choose_invoice_builder("المعاينة")
     assert captured["options"] == PHASE1_TEMPLATE_OPTIONS
-    assert len(PHASE1_TEMPLATE_OPTIONS) == 25
+    assert len(PHASE1_TEMPLATE_OPTIONS) == 26
 
 
 def test_phase2_model13_is_phase1_v5_with_the_signed_qr(monkeypatch):
@@ -622,6 +626,7 @@ def test_phase2_model13_is_phase1_v5_with_the_signed_qr(monkeypatch):
         (23, "build_phase1_invoice_mawsim", "build_invoice_html_v13"),
         (24, "build_phase1_invoice_afnan", "build_invoice_html_v29"),
         (25, "build_phase1_invoice_banshar", "build_invoice_html_v30"),
+        (26, "build_phase1_invoice_yarmouk", "build_invoice_html_v31"),
     ],
 )
 def test_phase1_new_designs_swap_in_the_phase1_qr(monkeypatch, choice, wrapper_name, raw_name):

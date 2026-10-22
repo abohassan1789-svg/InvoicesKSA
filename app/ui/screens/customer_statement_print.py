@@ -118,6 +118,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
 from app.ui.common.saudi_invoice_style import si_icon, style_button
+from app.ui.screens.saudi_invoice_print_v31 import CAIRO, address_lines, font_face_css
 from app.ui.screens.saudi_invoice_print import (
     amount_in_words_ar,
     choose_invoice_template,
@@ -167,6 +168,8 @@ STATEMENT_TEMPLATE_OPTIONS: tuple[str, ...] = (
     "النموذج الحادي والعشرون",
     "النموذج الثاني والعشرون",
     "النموذج الثالث والعشرون",
+    # «ثمار اليرموك» — نسخة من كشف حساب الشركاء الذي أرسله المستخدم (2026-10-22).
+    "النموذج الرابع والعشرون",
 )
 
 _ZERO = Decimal("0.00")
@@ -2166,6 +2169,228 @@ del _build
 
 
 # ---------------------------------------------------------------------------
+# النموذج الرابع والعشرون — «ثمار اليرموك» (added 2026-10-22). Portrait
+# ---------------------------------------------------------------------------
+# A replica of the partner statement the user supplied with the «ثمار اليرموك»
+# invoice (an Odoo «كشف حساب الشركاء | PARTNER STATEMENT», 2026-10-17): the
+# letterhead box, the title, four filter chips, the partner box, four balance
+# cards, the report-context bar, then التاريخ / البيان والمرجع / مدين / دائن /
+# الرصيد with an opening row and a closing totals row. Geometry is the source's
+# (CSS pt = PDF pt; its 530pt-wide content fits the 186mm printable width).
+_Y_BROWN, _Y_TAN, _Y_INK = "#453223", "#af937f", "#1e2926"
+_Y_SUB, _Y_MUTE, _Y_LINE = "#52625d", "#64736e", "#b7c7c1"
+
+_Y_CSS = """
+  .yk { font-family: %(cairo)s; color: #1e2926; direction: ltr; text-align: left; }
+  .yk .ar { direction: rtl; unicode-bidi: isolate; }
+  .yk .hd { display: grid; grid-template-columns: 19%% 51%% 30%%; border-top: 1.8pt solid #453223;
+            border-bottom: 0.6pt solid #453223; min-height: 62.4pt; }
+  .yk .hd > div { border-left: 0.6pt solid #d3d9d7; }
+  .yk .hd > div:first-child { border-left: 0.6pt solid #d3d9d7; }
+  .yk .hd > div:last-child { border-right: 0.6pt solid #d3d9d7; background: #edf3f0; }
+  .yk .logo { display: flex; align-items: center; justify-content: center; }
+  .yk .logo img { max-width: 44pt; max-height: 42pt; object-fit: contain; display: block; }
+  .yk .co { padding: 4.5pt 7.8pt 3pt; }
+  .yk .co b { display: block; font-size: 10.2pt; font-weight: 600; line-height: 1.874; margin-bottom: -3.3pt; }
+  .yk .co > span { display: block; font-size: 6pt; line-height: 7.2pt; color: #52625d; }
+  .yk .ids { padding: 0 7.8pt; display: flex; flex-direction: column; justify-content: center; gap: 3pt; }
+  .yk .ids i { display: block; font-style: normal; font-size: 6pt; font-weight: 600; color: #453223; line-height: 9pt; }
+  .yk .ids div > span { display: block; font-size: 6pt; line-height: 9pt; }
+  .yk .ttl { margin-top: 4.3pt; font-size: 12.6pt; color: #af937f; line-height: 1.874; }
+  .yk .sub { font-size: 6pt; color: #64736e; letter-spacing: 0.6pt; line-height: 1.874; margin-top: -6pt; }
+  .yk .chips { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3pt; margin: 1.7pt 3pt 0; }
+  .yk .chip { background: #f3f6f5; border-left: 1.2pt solid #7d9d91; border-top: 0.6pt solid #dde3e1;
+              border-bottom: 0.6pt solid #dde3e1; border-right: 0.6pt solid #dde3e1; height: 24.6pt;
+              padding: 0 6pt; box-sizing: border-box; }
+  .yk .chip i { display: block; font-style: normal; font-size: 5.4pt; font-weight: 600; color: #64736e;
+                line-height: 1.874; margin-top: 2.6pt; }
+  .yk .chip b { display: block; font-size: 6.6pt; font-weight: 600; line-height: 1.874; margin-top: -2.8pt; }
+  .yk .partner { margin-top: 7.1pt; border-left: 2.4pt solid #245b49; border-top: 0.6pt solid #b7c7c1;
+                 border-bottom: 0.6pt solid #b7c7c1; border-right: 0.6pt solid #453223;
+                 padding: 2.4pt 6.6pt 3.6pt; }
+  .yk .partner i { display: block; font-style: normal; font-size: 5.4pt; font-weight: 600; color: #64736e;
+                   line-height: 1.874; }
+  .yk .partner b { display: block; font-size: 9pt; font-weight: 600; line-height: 1.874; margin-top: -3.9pt; }
+  .yk .partner > span { display: block; font-size: 6pt; color: #52625d; line-height: 1.874; margin-top: -3.8pt; }
+  .yk .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2.4pt; margin: 5.4pt 2.4pt 0;
+               page-break-inside: avoid; }
+  .yk .card { border-top: 0.6pt solid #b7c7c1; border-bottom: 0.6pt solid #b7c7c1; border-left: 0.6pt solid #d3d9d7;
+              border-right: 0.6pt solid #d3d9d7; height: 28.3pt; text-align: center; box-sizing: border-box; }
+  .yk .card.op { background: #f4f6f5; }
+  .yk .card.cl { background: #af937f; }
+  .yk .card i { display: block; font-style: normal; font-size: 5.4pt; font-weight: 600; line-height: 1.874;
+                margin-top: 3.4pt; }
+  .yk .card b { display: block; font-size: 7.2pt; font-weight: 600; line-height: 1.874; margin-top: -2.4pt; }
+  .yk table.tb { margin-top: 6.6pt; table-layout: fixed; width: 100%%; border-collapse: collapse; }
+  .yk .tb thead { display: table-header-group; }
+  .yk .tb tfoot { display: table-row-group; }
+  .yk .ctx td { background: #af937f; color: #000; font-size: 6pt; text-align: center; height: 19.2pt;
+                line-height: 7.2pt; padding: 0 3pt; border-left: 0.6pt solid #fff; }
+  .yk .ctx td:first-child { border-left: 0; font-weight: 700; }
+  .yk .ctx td > div { border-left: 0.6pt solid #fff; }
+  .yk .cols th { background: #453223; color: #fff; font-weight: 400; font-size: 6pt; line-height: 7.2pt;
+                 height: 22.8pt; text-align: center; padding: 0 3pt; border-left: 0.6pt solid #3a2b1f; }
+  .yk .tb td.d { text-align: center; }
+  .yk .tb td.m { text-align: right; white-space: nowrap; }
+  .yk .tb tbody td { font-size: 7.2pt; line-height: 1.874; padding: 2.4pt 3.6pt 0; vertical-align: top;
+                     border-left: 0.6pt solid #d7e0dc; border-bottom: 0.6pt solid #d7e0dc; height: 26.4pt; }
+  .yk .tb tbody td:first-child { border-left: 0.6pt solid #d7e0dc; }
+  .yk .tb tbody td:last-child { border-right: 0.6pt solid #d7e0dc; }
+  .yk .tb tbody tr.mv:nth-child(even) td { background: #f6f8f7; }
+  .yk .tb tbody tr.op td { background: #eef3f0; font-weight: 600; border-top: 0.6pt solid #9fb5ad; }
+  .yk .tb tbody tr.op td.d { line-height: 9.6pt; padding-top: 3.8pt; }
+  .yk .tb td .ref { font-weight: 600; }
+  .yk .tb td small { display: block; font-size: 5.4pt; color: #6b7974; line-height: 1.874; margin-top: -2pt; }
+  .yk .tb tfoot td { background: #af937f; color: #000; font-size: 7.2pt; font-weight: 600; height: 19.8pt;
+                     padding: 0 3.6pt; }
+  .yk .note { border-top: 0.6pt solid #b7c7c1; margin-top: 4.2pt; padding-top: 0.6pt; font-size: 5.4pt;
+              color: #6b7974; line-height: 1.874; }
+  /* Page n / N in the bottom margin (Chromium prints margin boxes; a web font
+     there blanks the box, so it names installed faces only). */
+  @page { @bottom-center { content: "صفحة | Page " counter(page) " / " counter(pages);
+                           font-family: 'DejaVu Sans', Tahoma, Arial, sans-serif; font-size: 5.4pt;
+                           color: #626262; } }
+"""
+
+
+def _sr(value: Any) -> str:
+    """«SR 2,226.40» — the source's currency format (a credit balance keeps its sign)."""
+    return f"SR {_money(_d(value))}"
+
+
+def _yk_bound(label: Any, open_word: str) -> str:
+    text = str(label or "").strip()
+    return "-" if not text or text == open_word else _esc(text)
+
+
+def build_statement_html_v24(data: dict[str, Any]) -> str:
+    """«ثمار اليرموك»: the user's Odoo partner statement, live.
+
+    The opening balance is ``data["opening_balance"]`` — every movement of the
+    same customer / company before «من» (the screen reads it; 0.00 when the
+    statement has no start date). Without it the opening row and card print «—»
+    and the running balance starts at zero, as on every other template.
+    The CR line under the VAT number is new (the source prints the VAT only).
+    """
+    rows = _rows(data)
+    company = data.get("company") if isinstance(data.get("company"), dict) else None
+    customer = data.get("customer") or {}
+    raw_opening = data.get("opening_balance")
+    opening = _d(raw_opening) if raw_opening is not None else _ZERO
+    opening_text = _sr(opening) if raw_opening is not None else "—"
+    debit = sum((_d(r.get("debit")) for r in rows), _ZERO)
+    credit = sum((_d(r.get("credit")) for r in rows), _ZERO)
+    closing = opening + debit - credit
+
+    # Letterhead: logo | company + address | VAT (+ CR).
+    head = ""
+    if company:
+        logo = company_logo_data_uri(company)
+        lines = address_lines(company.get("address_ar"), 5)
+        if lines and len(lines) < 6:
+            lines.append("المملكة العربية السعودية")
+        ids = "".join(
+            f'<div><i><span class="ar">{ar}</span> | {en}</i><span>{_esc(v)}</span></div>'
+            for ar, en, v in (("الرقم الضريبي", "VAT", company.get("vat_number")),
+                              ("السجل التجاري", "CR", company.get("commercial_registration"))) if v)
+        head = (
+            '<div class="hd">'
+            + (f'<div class="logo"><img src="{logo}" alt="logo"></div>' if logo else "<div></div>")
+            + f'<div class="co"><b class="ar">{_esc(company.get("name_ar"))}</b>'
+            + "".join(f"<span>{_esc(t)}</span>" for t in lines) + "</div>"
+            + f'<div class="ids">{ids}</div></div>'
+        )
+
+    chips = '<div class="chips">' + "".join(
+        f'<div class="chip"><i><span class="ar">{ar}</span> | {en}</i><b>{val}</b></div>'
+        for ar, en, val in (
+            ("من", "From", _yk_bound(data.get("date_from_label"), "البداية")),
+            ("إلى", "To", _yk_bound(data.get("date_to_label"), "النهاية")),
+            ("القيود", "Entries", '<span class="ar">مرحلة</span> | Posted'),
+            ("التسويات", "Reconciliation", '<span class="ar">متضمنة</span> | Included'),
+        )) + "</div>"
+
+    name = _esc(customer.get("customer_name") or data.get("customer_label") or "الكل")
+    vat = _esc(customer.get("vat_number"))
+    detail = " ".join(x for x in (name, _esc(customer.get("address"))) if x)
+    partner = (
+        '<div class="partner"><i><span class="ar">الشريك</span> | Partner</i>'
+        f'<b class="ar">{name}</b>'
+        f'<span><span class="ar">{detail}</span>{f" | VAT {vat}" if vat else ""}</span></div>'
+    )
+
+    cards = '<div class="cards">' + "".join(
+        f'<div class="card {cls}"><i><span class="ar">{ar}</span> | {en}</i><b>{val}</b></div>'
+        for cls, ar, en, val in (
+            ("op", "الرصيد الافتتاحي", "Opening", opening_text),
+            ("", "مدين الفترة", "Period debit", _sr(debit)),
+            ("", "دائن الفترة", "Period credit", _sr(credit)),
+            ("cl", "الرصيد الختامي", "Closing", _sr(closing)),
+        )) + "</div>"
+
+    # The context bar's six cells and the five columns break at different
+    # points, so one colgroup carries every edge of both (source pt).
+    tracks = (64.2, 25.8, 87.1, 87.6, 75.0, 12.6, 51.0, 36.6, 27.0, 63.6)
+    colgroup = ("<colgroup>" + "".join(f'<col style="width:{w * 100 / sum(tracks):.3f}%;">' for w in tracks)
+                + "</colgroup>")
+    context = (
+        '<tr class="ctx">'
+        f'<td colspan="2"><span class="ar">{_esc(company.get("name_ar")) if company else "الكل"}</span></td>'
+        '<td><span class="ar">كشف حساب الشريك</span> | Partner statement</td>'
+        f'<td><span class="ar">{name}</span></td>'
+        f'<td colspan="2"><span class="ar">الرقم الضريبي</span> | VAT<br>{vat or "-"}</td>'
+        '<td colspan="2">- — -</td>'
+        '<td colspan="2"><span class="ar">سياق التقرير</span> | Report context</td></tr>'
+    )
+    cols = (
+        '<tr class="cols">'
+        '<th><span class="ar">التاريخ</span><br>Date</th>'
+        '<th colspan="4"><span class="ar">البيان والمرجع</span><br>Details and reference</th>'
+        '<th colspan="2"><span class="ar">مدين</span><br>Debit</th>'
+        '<th colspan="2"><span class="ar">دائن</span><br>Credit</th>'
+        '<th><span class="ar">الرصيد</span><br>Balance</th></tr>'
+    )
+
+    def tr(cls: str, date_html: str, detail_html: str, d: Any, c: Any, bal: Any) -> str:
+        return (f'<tr class="{cls}"><td class="d">{date_html}</td><td colspan="4">{detail_html}</td>'
+                f'<td class="m" colspan="2">{_sr(d)}</td><td class="m" colspan="2">{_sr(c)}</td>'
+                f'<td class="m">{bal}</td></tr>')
+
+    body = [tr("op", '<span class="ar">افتتاحي</span><br>Opening', '<span class="ar">الرصيد الافتتاحي</span>',
+               0, 0, opening_text)]
+    balance = opening
+    for r in rows:
+        balance += _d(r.get("debit")) - _d(r.get("credit"))
+        journal = "INV" if _d(r.get("debit")) else "CSH"
+        body.append(tr(
+            "mv", _esc(r.get("transaction_date")),
+            f'<span class="ref ar">{_esc(r.get("description"))}</span>'
+            f'<small><span class="ar">اليومية</span> | JRNL {journal}</small>',
+            r.get("debit"), r.get("credit"), _sr(balance)))
+    foot = (
+        '<tfoot><tr><td colspan="5"><span class="ar">إجمالي حركة الفترة والرصيد الختامي</span>'
+        f' | Period totals and closing</td><td class="m" colspan="2">{_sr(debit)}</td>'
+        f'<td class="m" colspan="2">{_sr(credit)}</td><td class="m">{_sr(closing)}</td></tr></tfoot>'
+    )
+    table = (f'<table class="tb">{colgroup}<thead>{context}{cols}</thead>'
+             f'<tbody>{"".join(body)}</tbody>{foot}</table>')
+
+    return _document(
+        _style(_Y_CSS % {"cairo": CAIRO} + font_face_css())
+        + '<div class="yk">' + head
+        + '<div class="ttl ar" style="direction:rtl; text-align:left;">كشف حساب الشركاء</div>'
+        + '<div class="sub">PARTNER STATEMENT</div>'
+        + chips + partner + cards + table + _empty_note(data) + _stamp(data)
+        + '<div class="note"><span class="ar">تم إنشاء الكشف من القيود المحاسبية وفق المرشحات أعلاه.</span></div>'
+        + "</div>",
+        landscape=False,
+    )
+
+
+build_statement_html_v24.landscape = False  # type: ignore[attr-defined]
+
+
+# ---------------------------------------------------------------------------
 # Dispatch + page layout
 # ---------------------------------------------------------------------------
 _BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
@@ -2192,6 +2417,7 @@ _BUILDERS: dict[int, Callable[[dict[str, Any]], str]] = {
     21: build_statement_html_v21,
     22: build_statement_html_v22,
     23: build_statement_html_v23,
+    24: build_statement_html_v24,
 }
 
 
@@ -2476,6 +2702,7 @@ __all__ = [
     "build_statement_html_v21",
     "build_statement_html_v22",
     "build_statement_html_v23",
+    "build_statement_html_v24",
     "choose_statement_builder",
     "statement_page_layout",
     "rows_with_balance",

@@ -39,6 +39,7 @@ from app.ui.screens.customer_statement_print import (
     build_statement_html_v21,
     build_statement_html_v22,
     build_statement_html_v23,
+    build_statement_html_v24,
     _move,
     _settlement_days,
     rows_with_balance,
@@ -85,15 +86,22 @@ FIFTH_BUILDERS = [
     ("النموذج الثاني والعشرون", build_statement_html_v22),
     ("النموذج الثالث والعشرون", build_statement_html_v23),
 ]
+# The sixth, 2026-10-22: a replica of the user's own «ثمار اليرموك» partner statement.
+SIXTH_BUILDERS = [
+    ("النموذج الرابع والعشرون", build_statement_html_v24),
+]
 ALL_BUILDERS = (BUILDERS + NEW_BUILDERS + SECOND_BUILDERS + THIRD_BUILDERS + FOURTH_BUILDERS
-                + FIFTH_BUILDERS)
+                + FIFTH_BUILDERS + SIXTH_BUILDERS)
+# Every template designed here — not the sixth pick, which keeps its source's
+# letterhead (no English name), title, opening balance and footer line.
+HOUSE_BUILDERS = [b for b in ALL_BUILDERS if b not in SIXTH_BUILDERS]
 # Every template but النموذج التاسع, which carries the identity in its side
 # column instead of the three-column letterhead, النموذج الخامس عشر, whose top
 # is the sender block beside the envelope window, and the fifth pick, whose
 # header (logo, company, then the title) the user dictated.
 LETTERHEAD_BUILDERS = [b for b in ALL_BUILDERS
                        if b[1] not in (build_statement_html_v9, build_statement_html_v15)
-                       and b not in FIFTH_BUILDERS]
+                       and b not in FIFTH_BUILDERS and b not in SIXTH_BUILDERS]
 
 
 def _header_labels(html_text: str) -> list[str]:
@@ -169,7 +177,7 @@ COMPANY = {
 # ======================================================================
 # The company letterhead (all three templates, 2026-07-17)
 # ======================================================================
-@pytest.mark.parametrize("label,build", ALL_BUILDERS)
+@pytest.mark.parametrize("label,build", HOUSE_BUILDERS)
 def test_letterhead_prints_the_company_in_both_languages_with_its_logo(label, build) -> None:
     html = build(_data())
     assert "شركة الشرارة المضيئة" in html, f"{label}: no Arabic company name"
@@ -196,7 +204,7 @@ def test_letterhead_puts_arabic_right_english_left_and_the_logo_between(label, b
     assert english < logo < arabic, f"{label}: letterhead columns out of order"
 
 
-@pytest.mark.parametrize("label,build", ALL_BUILDERS)
+@pytest.mark.parametrize("label,build", HOUSE_BUILDERS)
 def test_no_letterhead_when_the_filter_spans_every_company(label, build) -> None:
     """«الكل» has no single issuer, so the sheet must not claim one."""
     data = {**_data(), "company": None}
@@ -353,7 +361,7 @@ def test_no_template_declares_a_font_inline(label: str, builder) -> None:
     )
 
 
-@pytest.mark.parametrize("label, builder", ALL_BUILDERS, ids=[b[0] for b in ALL_BUILDERS])
+@pytest.mark.parametrize("label, builder", HOUSE_BUILDERS, ids=[b[0] for b in HOUSE_BUILDERS])
 def test_no_template_invents_an_opening_balance(label: str, builder) -> None:
     """The query reads nothing before the period, so there is no opening balance.
 
@@ -396,7 +404,7 @@ def test_v2_keeps_the_closing_balance_but_no_per_row_balance_column() -> None:
     assert "الرصيد الختامي المستحق على العميل" in html    # and the closing total
 
 
-@pytest.mark.parametrize("label,build", ALL_BUILDERS)
+@pytest.mark.parametrize("label,build", HOUSE_BUILDERS)
 def test_a_company_without_a_logo_still_gets_a_letterhead(label, build) -> None:
     """Two of the six companies have no logo — the letterhead must degrade, not break.
 
@@ -443,7 +451,7 @@ def test_orientation_is_declared_per_template() -> None:
     for build in (build_statement_html_v9, build_statement_html_v10, build_statement_html_v11,
                   build_statement_html_v12, build_statement_html_v13, build_statement_html_v14,
                   build_statement_html_v15, build_statement_html_v16, build_statement_html_v17,
-                  *(b for _, b in FIFTH_BUILDERS)):
+                  *(b for _, b in FIFTH_BUILDERS + SIXTH_BUILDERS)):
         assert build.landscape is False, build.__name__
 
 
@@ -451,7 +459,7 @@ def test_every_picker_option_has_a_builder() -> None:
     """A fourth option added to the picker without a builder would silently fall
     back to النموذج الأول — the exact bug the invoice dispatch test guards."""
     assert len(STATEMENT_TEMPLATE_OPTIONS) == len(_BUILDERS)
-    assert sorted(_BUILDERS) == list(range(1, 24))
+    assert sorted(_BUILDERS) == list(range(1, 25))
     for index, (_label, build) in enumerate(ALL_BUILDERS, start=1):
         assert _BUILDERS[index] is build
 
@@ -780,7 +788,7 @@ def _stamped(**overrides) -> dict:
     return data
 
 
-@pytest.mark.parametrize("label,build", ALL_BUILDERS)
+@pytest.mark.parametrize("label,build", HOUSE_BUILDERS)
 def test_a_company_with_a_stamp_prints_it_once(label, build) -> None:
     html = build(_stamped())
     assert html.count(_STAMP_URI) == 1, f"{label}: the stamp must print exactly once"
@@ -789,7 +797,7 @@ def test_a_company_with_a_stamp_prints_it_once(label, build) -> None:
     assert "هذا الكشف صادر آلياً من النظام" in html, label
 
 
-@pytest.mark.parametrize("label,build", ALL_BUILDERS)
+@pytest.mark.parametrize("label,build", HOUSE_BUILDERS)
 def test_the_stamp_sits_after_the_totals_and_before_the_footer_line(label, build) -> None:
     """In flow, after every row and total, so it can never cover one of them."""
     html = build(_stamped())
@@ -801,7 +809,7 @@ def test_the_stamp_sits_after_the_totals_and_before_the_footer_line(label, build
     assert "break-inside:avoid" in block, label
 
 
-@pytest.mark.parametrize("label,build", ALL_BUILDERS)
+@pytest.mark.parametrize("label,build", HOUSE_BUILDERS)
 def test_no_stamp_prints_exactly_as_before(label, build) -> None:
     for data in (_data(), _stamped(stamp=None), _stamped(stamp=b"")):
         html = build(data)
@@ -810,3 +818,51 @@ def test_no_stamp_prints_exactly_as_before(label, build) -> None:
     everything = _stamped()
     everything["company"] = None   # «الكل»: no issuing company, so no stamp
     assert "co-stamp" not in build(everything), label
+
+
+# ======================================================================
+# النموذج الرابع والعشرون — «ثمار اليرموك» (2026-10-22, the user's own statement)
+# ======================================================================
+def test_v24_columns_and_source_labels() -> None:
+    html = build_statement_html_v24(_data())
+    for needle in ("كشف حساب الشركاء", "PARTNER STATEMENT", "| From", "| To", "| Posted", "| Included",
+                   "| Partner", "| Opening", "| Period debit", "| Period credit", "| Closing",
+                   "Partner statement", "Report context", "Details and reference",
+                   "Period totals and closing", "تم إنشاء الكشف من القيود المحاسبية وفق المرشحات أعلاه."):
+        assert needle in html, needle
+    heads = re.findall(r'<tr class="cols">(.*?)</tr>', html)[0]
+    assert [h for h in ("Date", "Details and reference", "Debit", "Credit", "Balance") if h in heads] == [
+        "Date", "Details and reference", "Debit", "Credit", "Balance"]
+    assert "SR 65,550.00" in html and "SR 58,200.00" in html
+
+
+def test_v24_letterhead_adds_the_cr_under_the_vat() -> None:
+    html = build_statement_html_v24(_data())
+    assert html.index("| VAT") < html.index("311474361800003") < html.index("| CR") < html.index("4030492763")
+
+
+def test_v24_without_an_opening_balance_prints_a_dash_not_a_number() -> None:
+    html = build_statement_html_v24(_data())
+    op = html.split('<tr class="op">')[1].split("</tr>")[0]
+    assert op.rstrip("</td>").endswith("—")
+    assert "SR 58,200.00" in html.split("<tfoot>")[1]       # closing = period difference
+
+
+def test_v24_opening_balance_carries_into_every_balance() -> None:
+    html = build_statement_html_v24({**_data(), "opening_balance": Decimal("1000")})
+    rows = html.split("<tbody>")[1].split("</tbody>")[0]
+    assert "SR 1,000.00" in rows.split('<tr class="mv">')[0]
+    assert "SR 66,550.00" in rows and "SR 46,550.00" in rows and "SR 59,200.00" in rows
+    assert "SR 59,200.00" in html.split("<tfoot>")[1]
+
+
+def test_v24_open_bounds_print_a_dash() -> None:
+    html = build_statement_html_v24({**_data(), "date_from_label": "البداية", "date_to_label": "النهاية"})
+    assert "البداية" not in html and "النهاية" not in html
+
+
+def test_v24_stamp_prints_once_after_the_totals() -> None:
+    html = build_statement_html_v24(_stamped())
+    assert html.count(_STAMP_URI) == 1
+    assert html.index("</table>") < html.index(_STAMP_URI) < html.index("تم إنشاء الكشف")
+    assert "co-stamp" not in build_statement_html_v24(_data())

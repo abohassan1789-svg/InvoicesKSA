@@ -419,6 +419,8 @@ class CustomerStatementReportScreen(QWidget):
             # each invoice's taxable amount / VAT, read from sales_invoices.
             "customer": self.service.customer_tax_identity(self.customer_combo.currentData()),
             "vat_breakdown": self.service.invoice_vat_breakdown(result.rows) if result else {},
+            # «ثمار اليرموك» (النموذج الرابع والعشرون): everything before «من».
+            "opening_balance": self.service.opening_balance(self._build_request()) if result else None,
             "company_label": self._combo_label(self.company_combo),
             "date_from_label": self._date_value(self.from_date) or "البداية",
             "date_to_label": self._date_value(self.to_date) or "النهاية",

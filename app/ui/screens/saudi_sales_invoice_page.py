@@ -2647,6 +2647,8 @@ class SaudiSalesInvoicePage(QWidget):
         from app.ui.screens.saudi_invoice_print_v29 import build_invoice_html_v29
         # «بنشر» (v30) — نسخة من PDF عرض أسعار «بنشر المشاري» (2026-10-22).
         from app.ui.screens.saudi_invoice_print_v30 import build_invoice_html_v30
+        # «ثمار اليرموك» (v31) — نسخة من PDF فاتورة «شركة ثمار اليرموك» (2026-10-22).
+        from app.ui.screens.saudi_invoice_print_v31 import build_invoice_html_v31
         # النماذج التاسع/العاشر/الحادي عشر = أول ثلاثة تصاميم من «مرحلة أولى» بنفس
         # الشكل، لكن بـ QR المرحلة الثانية الموقّع (٩ تاجات) عند الطباعة من هنا.
         from app.ui.screens.saudi_invoice_print_phase1 import (
@@ -2679,6 +2681,7 @@ class SaudiSalesInvoicePage(QWidget):
             "موسم الفاكهة",         # v13، بـ QR المرحلة الثانية الموقّع
             "أفنان جيزان",          # v29، بـ QR المرحلة الثانية الموقّع
             "بنشر",                 # v30، بـ QR المرحلة الثانية الموقّع
+            "ثمار اليرموك",         # v31، بـ QR المرحلة الثانية الموقّع
         )
         choice = choose_invoice_template(parent or self, action_label, options, orientation="vertical")
         if choice is None:
@@ -2710,6 +2713,7 @@ class SaudiSalesInvoicePage(QWidget):
             23: build_invoice_html_v13,       # «موسم الفاكهة»
             24: build_invoice_html_v29,       # «أفنان جيزان»
             25: build_invoice_html_v30,       # «بنشر»
+            26: build_invoice_html_v31,       # «ثمار اليرموك»
         }.get(choice, build_invoice_html)
 
     def print_menu_actions(self) -> "tuple[tuple[str, str, str, Callable[[], None]], ...]":

@@ -350,3 +350,32 @@ def test_customer_tax_identity_is_none_for_every_customer() -> None:
     service = CustomerStatementReportService(repository=_VatRepo())
     assert service.customer_tax_identity(None) is None
     assert service.customer_tax_identity(5)["vat_number"] == "300"
+
+
+# ----------------------------------------------------------------------
+# Opening balance (النموذج الرابع والعشرون «ثمار اليرموك», 2026-10-22)
+# ----------------------------------------------------------------------
+def test_opening_balance_sums_everything_before_the_start_date() -> None:
+    repo = _FakeRepo([_invoice_row(1, "INV-1", "credit", "1000.00"), _cash_payment_row(2, "INV-2", "300.00")])
+    service = CustomerStatementReportService(repo)
+    got = service.opening_balance(CustomerStatementRequest(customer_id="1", company_id=10,
+                                                           date_from="2026-03-01", date_to="2026-03-31"))
+    assert got == Decimal("700.00")
+    filters = repo.fetch_calls[-1]
+    assert (filters.customer_id, filters.company_id, filters.date_from, filters.date_to) == (
+        1, 10, None, "2026-02-28")
+
+
+def test_opening_balance_is_zero_without_a_start_date() -> None:
+    repo = _FakeRepo([_invoice_row(1, "INV-1", "credit", "1000.00")])
+    assert CustomerStatementReportService(repo).opening_balance(CustomerStatementRequest(customer_id=1)) == Decimal("0")
+    assert repo.fetch_calls == []
+
+
+def test_opening_balance_is_none_when_it_cannot_be_read() -> None:
+    class _Broken(_FakeRepo):
+        def fetch_statement(self, filters):
+            raise RuntimeError("db down")
+
+    service = CustomerStatementReportService(_Broken([]))
+    assert service.opening_balance(CustomerStatementRequest(customer_id=1, date_from="2026-03-01")) is None

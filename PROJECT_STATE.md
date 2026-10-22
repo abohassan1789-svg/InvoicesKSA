@@ -2,6 +2,35 @@
 
 Last updated: 2026-09-19
 
+## «بنشر» — Quotation Replica as an Invoice Template (added 2026-10-22)
+
+A layout replica of the user's ``عرض الأسعار 4000060_1_20261011_2038.PDF`` (بنشر
+المشاري لخدمات السيارات, a two-page Reporting Services quotation), added as
+**option 25, the last of both invoice pickers**, under the name **«بنشر»**:
+
+- Module `saudi_invoice_print_v30.py` (`build_invoice_html_v30`): geometry in the
+  source's A4 points, scaled ×1056/841.89 so the whole A4 page fits the Letter
+  sheet (centred, 34.7px side margins) — every page holds what the source's does.
+- Live: seller header (EN name / address_en / CR / VAT left, Arabic mirrored right,
+  logo centre — CR + address were added at the user's request, the source has an
+  activity line instead), date / invoice no. / payment, buyer and seller tables,
+  items, sum row, totals, stamp, QR. The national-address rows come from the
+  free-text address via `national_address()` (labels «حي/شارع/الرمز البريدي/رقم
+  المبنى…», bare 5-digit = postal, 4-digit = building then additional, unlabelled
+  parts from the end = city, district, street); seller «الدولة» defaults to KSA,
+  buyer «رمز الدولة» is «SA» when the address names the Kingdom.
+- Changed for an invoice: title «فاتورة ضريبية - Tax Invoice» (Arabic on the left), «Invoice No / رقم
+  الفاتورة». Blank (no data): الفرع, البيان, رصيد العميل, الموقع, رقم التواصل; line
+  «خصومات» 0.00. Footer: print time + «طباعة بواسطة» = new `data["printed_by"]`
+  (signed-in user, both data collectors) + «صفحة رقم ( x / y )».
+- QR (shared `QR_PRINT_PX`) left of the totals, which narrow proportionally; stamp
+  above the totals. Totals / sum row on the last page only (the source repeats
+  them), so a one-page invoice holds 12 rows (the source fits 16 without a QR).
+- Fonts: Arial Bold + Times New Roman Bold (the source's Times words), fallbacks
+  Liberation Sans / Serif and the bundled Noto Naskh Arabic — no new files.
+- Phase-2 → `build_invoice_html_v30`; «مرحلة أولى» → `build_phase1_invoice_banshar`.
+  Tests: `tests/unit/test_invoice_print_v30.py`.
+
 ## «أفنان جيزان» — Invoice Replica (added 2026-10-21)
 
 A layout replica of the user's ``شركة افنان جيزان للتجارة _ 0352.pdf`` (seller

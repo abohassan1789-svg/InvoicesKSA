@@ -156,6 +156,7 @@ $templateModules = @(
     'saudi_invoice_print_v15.py', 'saudi_invoice_print_v16.py', 'saudi_invoice_print_v17.py',
     'saudi_invoice_print_v18.py', 'saudi_invoice_print_v19.py', 'saudi_invoice_print_v20.py',
     'saudi_invoice_print_v21.py', 'saudi_invoice_print_v28.py', 'saudi_invoice_print_v29.py',
+    'saudi_invoice_print_v30.py',
     'saudi_invoice_print_phase1.py', 'saudi_voucher_print_phase1.py',
     'saudi_receipt_voucher_print.py', 'saudi_receipt_voucher_print_v10.py',
     'saudi_receipt_voucher_print_v11.py', 'saudi_receipt_voucher_print_v12.py',

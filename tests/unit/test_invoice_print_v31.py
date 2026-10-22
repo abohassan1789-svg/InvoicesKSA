@@ -50,7 +50,7 @@ def test_prints_the_live_invoice_like_the_source():
         "VAT Amount", "Total Excl. VAT", "Total Incl. VAT", "[002] <bdi>شمام صغير</bdi>", ">88.00<", "15%",
         "1,936.00", "290.40", "2,226.40", "Invoice Taxable Amount | المبلغ الخاضع للضريبة",
         "VAT Total Amount | إجمالي ضريبة القيمة المضافة", "Invoice Gross Total (Inclusive of VAT)",
-        "Paid on 2026-09-12", "Amount Due", "Payment Communication", 'alt="QR"', 'data-company-stamp="1"',
+        "Paid on 2026-09-12", "Amount Due", "Payment Communication", "في هذا الحساب", "on this account: <b>SA2080000510608010699851</b>", "مصرف الراجحى", 'alt="QR"', 'data-company-stamp="1"',
         "14:02:08 2026-09-12", 'alt="SAR"',
     ):
         assert needle in html, needle

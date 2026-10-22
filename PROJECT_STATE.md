@@ -13,8 +13,8 @@ Two replicas of the user's Odoo PDFs (شركة ثمار اليرموك → شر�
   dates = invoice date), «العميل | Bill to» (address lines, Saudi Arabia, buyer CR
   line when stored, VAT), items «[code] name», totals box (Discount row only when
   there is one; «Paid on» = cash invoices only, «Amount Due» = total − paid),
-  shared-size QR, payment-communication line (the bank-account line is dropped —
-  no bank data), stamp under it, issue time + VAT footer. Band follows the rows;
+  shared-size QR, payment-communication line (invoice number) and the fixed account line
+  «في هذا الحساب | on this account: SA2080000510608010699851 - مصرف الراجحى» (user 2026-10-22), stamp under it, issue time + VAT footer. Band follows the rows;
   paginates via `invoice_pagination`. `address_lines()` splits free-text addresses.
   Phase-2 → `build_invoice_html_v31`; «مرحلة أولى» → `build_phase1_invoice_yarmouk`.
   Tests: `tests/unit/test_invoice_print_v31.py`.

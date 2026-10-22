@@ -13,9 +13,9 @@ What the program has no data for, and how it prints:
 * «Paid on …» prints for a cash invoice only (paid in full on the invoice date, so
   «Amount Due» is 0.00); a credit invoice prints no «Paid» row and its whole total
   as «Amount Due»;
-* the payment-communication line keeps «التواصل بشأن الدفع | Payment Communication»
-  with the invoice number; the bank-account line under it is dropped (no bank
-  account is stored for a company);
+* «التواصل بشأن الدفع | Payment Communication» carries the invoice number; the
+  account line under it («في هذا الحساب | on this account: … - مصرف الراجحى») is
+  fixed text, the source's IBAN and bank (user 2026-10-22);
 * a discount, which the source has no row for, adds «Discount | الخصم» to the
   totals box only when there is one;
 * the buyer's CR (which the source does not print) is a line of its own above the
@@ -109,7 +109,9 @@ _BOX_L = 234.7
 _BOX_PAD = 4.8               # frame → first row
 _BOX_ROW = 16.2
 _PAY_GAP = 22.3              # box bottom → payment line
-_PAY_H = 18.0
+_PAY_H = 32.4               # two lines, 14.4 apart
+_ACCOUNT_IBAN = "SA2080000510608010699851"
+_ACCOUNT_BANK = "مصرف الراجحى"
 _STAMP_H = 70.0
 _QR_PT = QR_PRINT_PX / _SCALE
 _PAGE_BOT = 780.0            # rows never run past this on any page
@@ -380,6 +382,9 @@ def _band_html(data: dict[str, Any], top: float) -> str:
     out.append(_text(_RIGHT, pay_top, 9.6, _HEAD,
                      'التواصل بشأن الدفع | <span dir="ltr">Payment Communication: '
                      f'<b>{_esc(data.get("invoice_number"))}</b></span>', width=420))
+    out.append(_text(_RIGHT, pay_top + 14.4, 9.6, _HEAD,
+                     f'في هذا الحساب | <span dir="ltr">on this account: <b>{_ACCOUNT_IBAN}</b></span>'
+                     f' - <b>{_ACCOUNT_BANK}</b>', width=420))
     stamp_uri = company_stamp_data_uri(data.get("seller") or {}) if data.get("show_stamp") else ""
     if stamp_uri:
         out.append(_box(_RIGHT - 120, pay_top + _PAY_H + 6, 110, _STAMP_H,
@@ -484,6 +489,7 @@ def build_invoice_html_v31(data: dict[str, Any]) -> str:
   .items td.c-pdesc {{ text-align:right; direction:rtl; white-space:normal; overflow-wrap:anywhere;
                       font-size:{_p(7.0)}px; }}
   .items tbody tr:first-child td {{ border-top:0; }}
+  .sheet > div b {{ font-weight:600; }}
   .money {{ white-space:nowrap; }}
   img.sar {{ height:{_p(6.0)}px; width:auto; vertical-align:{_p(-0.2)}px; }}
   .tot {{ position:static; width:100%; }}

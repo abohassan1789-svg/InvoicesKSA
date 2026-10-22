@@ -19,7 +19,7 @@ A layout replica of the user's ``عرض الأسعار 4000060_1_20261011_2038.P
   المبنى…», bare 5-digit = postal, 4-digit = building then additional, unlabelled
   parts from the end = city, district, street); seller «الدولة» defaults to KSA,
   buyer «رمز الدولة» is «SA» when the address names the Kingdom.
-- Changed for an invoice: title «Tax Invoice - فاتورة ضريبية», «Invoice No / رقم
+- Changed for an invoice: title «فاتورة ضريبية - Tax Invoice» (Arabic on the left), «Invoice No / رقم
   الفاتورة». Blank (no data): الفرع, البيان, رصيد العميل, الموقع, رقم التواصل; line
   «خصومات» 0.00. Footer: print time + «طباعة بواسطة» = new `data["printed_by"]`
   (signed-in user, both data collectors) + «صفحة رقم ( x / y )».

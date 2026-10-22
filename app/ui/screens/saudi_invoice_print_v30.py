@@ -7,7 +7,8 @@ A *layout* replica, like «أفنان جيزان» (v29): the seller (both langu
 the buyer, the items, the totals and the stamp come live from the shared ``data``
 dict. What changed because this prints an invoice, not a quotation:
 
-* the title reads «Tax Invoice - فاتورة ضريبية» (was «Quotation - عرض سعر») and
+* the title reads «فاتورة ضريبية - Tax Invoice», Arabic on the left (was «Quotation -
+  عرض سعر», user's pick 2026-10-22) and
   «Invoice No / رقم الفاتورة» replaces «Document No / رقم العرض»;
 * the QR (which a quotation does not have) sits left of the totals, at the shared
   ``QR_PRINT_PX``; the totals table narrows to make room, keeping its proportions,
@@ -306,7 +307,8 @@ def _header_html(seller: dict[str, Any]) -> str:
     logo = _box(220.7, 26.2, 145.0, 56.8,
                 f'<img src="{logo_uri}" alt="logo" style="width:100%; height:100%; object-fit:contain; display:block;">',
                 "") if logo_uri else ""
-    title = _box(208.6, 98.7, 179.6, 18.3, "Tax Invoice - فاتورة ضريبية",
+    title = _box(208.6, 98.7, 179.6, 18.3,
+                 '<span dir="ltr"><span dir="rtl">فاتورة ضريبية</span> - Tax Invoice</span>',
                  f"background:{_BAND}; text-align:center; font-size:{_p(13)}px; line-height:{_p(18.3)}px; "
                  "white-space:nowrap;")
     return frame + left + logo + right + title

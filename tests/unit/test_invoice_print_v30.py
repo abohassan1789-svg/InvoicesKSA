@@ -53,7 +53,7 @@ def test_prints_the_live_invoice_like_the_source():
         "Publishing Al -Mashari For Auto Services", "Ali Bin Abi Talib St, Al Khalidiyah, Al Wajh",
         "CR No : 3550123456", "VAT No : 301158779400003", "بنشر المشاري لخدمات السيارات",
         "السجل التجاري : <bdi>3550123456</bdi>", "الرقم الضريبي : <bdi>301158779400003</bdi>",
-        'alt="logo"', "Tax Invoice - فاتورة ضريبية",
+        'alt="logo"', '<span dir="ltr"><span dir="rtl">فاتورة ضريبية</span> - Tax Invoice</span>',
         "Branch", "الفرع", "Note", "البيان", "رصيد العميل", ">2026/07/07<", "رقم الفاتورة",
         ">4000060<", "طريقة الدفع", ">شبكة<",
         "المشتري", "البائع", "اسم العميل", "<bdi>شركة النقيب للإنارة الحديثة</bdi>",
@@ -102,7 +102,7 @@ def test_long_invoice_paginates_with_totals_on_the_last_page():
     html = build_invoice_html_v30(_data(40))
     sheets = html.split("<div data-sheet")[1:]
     assert len(sheets) > 1
-    assert html.count("Tax Invoice - فاتورة ضريبية") == len(sheets)     # header repeats
+    assert html.count('<span dir="ltr"><span dir="rtl">فاتورة ضريبية</span> - Tax Invoice</span>') == len(sheets)     # header repeats
     assert all("Total Taxable Amount" not in s and 'alt="QR"' not in s for s in sheets[:-1])
     assert "Total Taxable Amount" in sheets[-1] and 'alt="QR"' in sheets[-1]
     assert f"{len(sheets)}&nbsp;)" in sheets[0]
